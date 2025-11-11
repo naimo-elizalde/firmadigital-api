@@ -178,6 +178,26 @@ docker rmi firmadigital-api:latest
 docker system prune -a
 ```
 
+## ⚠️ Cambios Importantes - API Standalone
+
+**PROBLEMA RESUELTO**: La API original hacía llamadas a servicios externos que causaban errores `ClientProtocolException`. 
+
+**SOLUCIÓN**: Los servicios `/version` y `/fecha-hora` ahora funcionan de manera **completamente independiente** sin requerir servicios externos.
+
+✅ **Servicios que funcionan standalone**:
+- `/version` - Obtiene versión de la API
+- `/fecha-hora` - Obtiene fecha y hora del servidor
+
+⚠️ **Servicios que aún requieren implementación completa**:
+- `/appfirmardocumento` - Firma de documentos
+- `/appvalidarcertificadodigital` - Validación de certificados
+- `/appverificardocumento` - Verificación de documentos
+- `/certificado/revocado/{serial}` - Estado de certificado
+
+Ver **`SOLUCION-ERROR-SERVICIOS.md`** para detalles completos.
+
+---
+
 ## 📚 Documentación Adicional
 
 Este proyecto incluye documentación completa y ejemplos de uso:

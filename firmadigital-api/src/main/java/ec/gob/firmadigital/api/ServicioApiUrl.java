@@ -16,56 +16,90 @@
  */
 package ec.gob.firmadigital.api;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import java.util.logging.Logger;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
+import java.util.Base64;
 import java.util.logging.Level;
 
 /**
- * Permite validar la si un API URL es permitido.
+ * Permite validar si una API URL es permitida.
+ * Versión standalone sin dependencias de servicios externos.
  *
  * @author Ricardo Arguello
  */
 @Path("/url")
 public class ServicioApiUrl {
 
-    /**
-     * Nombre de la propiedad de sistema que contiene el archivo de
-     * configuracion del servidor WildFly (standalone.xml)
-     */
-    private static final String WS_SYSTEM_PROPERTY = "firmadigital-servicio.url";
-
-    // Servicio REST interno
-    private static final String REST_SERVICE_URL = System.getProperty(WS_SYSTEM_PROPERTY) + "/apiurl";
-
     private static final Logger LOGGER = Logger.getLogger(ServicioApiUrl.class.getName());
 
     @GET
     @Path("{base64}")
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.APPLICATION_JSON)
     public String validarEndpoint(@PathParam("base64") String base64) {
-        LOGGER.log(Level.INFO, "base64={0}", base64);
+        LOGGER.log(Level.INFO, "Validando URL base64={0}", base64);
+        
         try {
-            return buscarUrl(base64);
-        } catch (NotFoundException e) {
-            return "No se encuentra el servidor de búsqueda";
+            // Decodificar la URL de base64
+            String url = new String(Base64.getDecoder().decode(base64));
+            LOGGER.log(Level.INFO, "URL decodificada: {0}", url);
+            
+            // Validación básica de URL
+            boolean valida = validarUrl(url);
+            
+            JsonObject response = new JsonObject();
+            response.addProperty("resultado", valida ? "OK" : "INVALID");
+            response.addProperty("url", url);
+            response.addProperty("valida", valida);
+            response.addProperty("mensaje", valida ? "URL válida" : "URL no válida");
+            
+            return new Gson().toJson(response);
+            
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.WARNING, "Error al decodificar base64: {0}", e.getMessage());
+            
+            JsonObject error = new JsonObject();
+            error.addProperty("resultado", "ERROR");
+            error.addProperty("mensaje", "Base64 inválido");
+            return new Gson().toJson(error);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error al validar URL: {0}", e.getMessage());
+            
+            JsonObject error = new JsonObject();
+            error.addProperty("resultado", "ERROR");
+            error.addProperty("mensaje", "Error al validar URL: " + e.getMessage());
+            return new Gson().toJson(error);
         }
     }
-
-    private String buscarUrl(String base64) throws NotFoundException {
-        try (Client client = ClientBuilder.newClient()) {
-            WebTarget target = client.target(REST_SERVICE_URL).path("{base64}").resolveTemplate("base64", base64);
-            Invocation.Builder builder = target.request();
-            Invocation invocation = builder.buildGet();
-            return invocation.invoke(String.class);
+    
+    /**
+     * Valida si una URL tiene un formato válido y cumple con criterios básicos
+     */
+    private boolean validarUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
         }
+        
+        // Validar que comience con http:// o https://
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            return false;
+        }
+        
+        // Validar que tenga al menos un punto en el dominio
+        if (!url.contains(".")) {
+            return false;
+        }
+        
+        // Validar longitud razonable
+        if (url.length() > 2048) {
+            return false;
+        }
+        
+        return true;
     }
 }

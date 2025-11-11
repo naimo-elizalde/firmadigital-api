@@ -343,7 +343,13 @@
                 });
                 
                 const data = await response.text();
-                showResult('resultVersion', data);
+                try {
+                    // Intentar parsear como JSON para mejor visualización
+                    const jsonData = JSON.parse(data);
+                    showResult('resultVersion', JSON.stringify(jsonData, null, 2));
+                } catch {
+                    showResult('resultVersion', data);
+                }
             } catch (error) {
                 showResult('resultVersion', error.message, false);
             }

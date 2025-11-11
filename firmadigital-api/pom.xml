@@ -51,6 +51,12 @@
     </properties>
 
     <dependencies>
+        <!--Librería de firma digital local-->
+        <dependency>
+            <groupId>ec.gob.firmadigital</groupId>
+            <artifactId>libreria</artifactId>
+            <version>4.1.0-SNAPSHOT</version>
+        </dependency>
         <!--consumo de servicios web-->
         <dependency>
             <groupId>jakarta.platform</groupId>
