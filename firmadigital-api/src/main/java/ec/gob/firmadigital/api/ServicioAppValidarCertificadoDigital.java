@@ -192,13 +192,21 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
         }
         
         // Limpiar la cadena: eliminar espacios, saltos de línea, retornos de carro, tabulaciones
-        String cleaned = base64String.replaceAll("\\s+", "");
+        String cleaned = base64String.trim().replaceAll("\\s+", "");
         
         try {
+            // Intentar con decoder estándar primero
             return Base64.getDecoder().decode(cleaned);
-        } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE, "Error al decodificar Base64: {0}", e.getMessage());
-            throw new IllegalArgumentException("El contenido Base64 no es válido: " + e.getMessage());
+        } catch (IllegalArgumentException e1) {
+            LOGGER.log(Level.WARNING, "Fallo decodificación estándar, intentando con MIME decoder: {0}", e1.getMessage());
+            
+            try {
+                // Intentar con MIME decoder que es más permisivo
+                return Base64.getMimeDecoder().decode(cleaned);
+            } catch (IllegalArgumentException e2) {
+                LOGGER.log(Level.SEVERE, "Error al decodificar Base64 con ambos decoders: {0}", e2.getMessage());
+                throw new IllegalArgumentException("El contenido Base64 no es válido. Verifique que el contenido esté correctamente codificado.");
+            }
         }
     }
 }

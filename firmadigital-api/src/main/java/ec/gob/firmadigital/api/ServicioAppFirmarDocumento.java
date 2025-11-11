@@ -164,14 +164,29 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
             throw new IllegalArgumentException("Cadena Base64 vacía");
         }
         
+        // Log de la longitud original para debugging
+        LOGGER.log(Level.INFO, "Longitud Base64 original: {0}", base64String.length());
+        
         // Limpiar la cadena: eliminar espacios, saltos de línea, retornos de carro, tabulaciones
-        String cleaned = base64String.replaceAll("\\s+", "");
+        String cleaned = base64String.trim().replaceAll("\\s+", "");
+        
+        LOGGER.log(Level.INFO, "Longitud Base64 después de limpiar: {0}", cleaned.length());
+        LOGGER.log(Level.FINE, "Primeros 50 caracteres: {0}", cleaned.substring(0, Math.min(50, cleaned.length())));
+        LOGGER.log(Level.FINE, "Últimos 50 caracteres: {0}", cleaned.length() > 50 ? cleaned.substring(cleaned.length() - 50) : cleaned);
         
         try {
+            // Intentar con decoder estándar primero
             return Base64.getDecoder().decode(cleaned);
-        } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE, "Error al decodificar Base64: {0}", e.getMessage());
-            throw new IllegalArgumentException("El contenido Base64 no es válido: " + e.getMessage());
+        } catch (IllegalArgumentException e1) {
+            LOGGER.log(Level.WARNING, "Fallo decodificación estándar, intentando con MIME decoder: {0}", e1.getMessage());
+            
+            try {
+                // Intentar con MIME decoder que es más permisivo
+                return Base64.getMimeDecoder().decode(cleaned);
+            } catch (IllegalArgumentException e2) {
+                LOGGER.log(Level.SEVERE, "Error al decodificar Base64 con ambos decoders: {0}", e2.getMessage());
+                throw new IllegalArgumentException("El contenido Base64 no es válido. Verifique que el contenido esté correctamente codificado.");
+            }
         }
     }
 }
