@@ -21,21 +21,17 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
-import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.Form;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 /**
  * Este servicio permite obtener la fecha y hora del servidor en formato
  * ISO-8601.
+ * Versión standalone sin dependencias de servicios externos.
  *
  * @author Ricardo Arguello
  */
@@ -43,55 +39,36 @@ import jakarta.ws.rs.core.MediaType;
 public class ServicioFechaHora {
 
     /**
-     * Nombre de la propiedad de sistema que contiene el archivo de
-     * configuracion del servidor WildFly (standalone.xml)
-     */
-    private static final String WS_SYSTEM_PROPERTY = "firmadigital-servicio.url";
-
-    // Servicio REST interno
-    private static final String REST_SERVICE_URL = System.getProperty(WS_SYSTEM_PROPERTY) + "/version";
-
-    /**
-     * Retorna la fecha y hora del servidor, en formato ISO-8601.Por ejemplo:
-     * "2017-08-27T17:54:43.562-05:00"
+     * Retorna la fecha y hora del servidor, en formato ISO-8601.
+     * Por ejemplo: "2025-11-11T17:54:43.562-05:00"
      *
-     * @param base64
-     * @return
+     * @param base64 Token de validación (opcional)
+     * @return Fecha y hora en formato ISO-8601
      */
     @POST
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_PLAIN)
     public String getFechaHora(@FormParam("base64") String base64) {
-        try {
-            String respuesta = buscarVersion(base64);
-
-            String resultado;
-            try {
-                JsonObject jsonObject = new Gson().fromJson(respuesta, JsonObject.class);
-                resultado = jsonObject.get("resultado").getAsString();
-            } catch (NullPointerException | com.google.gson.JsonSyntaxException e) {
-                return null;
-            }
-
-            if (resultado.equals("Version enabled")) {
-                return ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-            } else {
-                return null;
-            }
-        } catch (NotFoundException e) {
-            return null;
-//            return "No se encuentra el servidor de búsqueda";
-        }
+        // Retorna directamente la fecha y hora del servidor
+        return ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
-    private String buscarVersion(String base64) throws NotFoundException {
-        try (Client client = ClientBuilder.newClient()) {
-            WebTarget target = client.target(REST_SERVICE_URL);
-            Invocation.Builder builder = target.request();
-            Form form = new Form();
-            form.param("base64", base64);
-            Invocation invocation = builder.buildPost(Entity.form(form));
-            return invocation.invoke(String.class);
-        }
+    /**
+     * Endpoint GET para obtener la fecha y hora en formato JSON
+     *
+     * @return JSON con fecha, hora y zona horaria
+     */
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getFechaHoraJson() {
+        ZonedDateTime now = ZonedDateTime.now();
+        
+        JsonObject response = new JsonObject();
+        response.addProperty("fechaHora", now.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        response.addProperty("timestamp", now.toEpochSecond());
+        response.addProperty("zonaHoraria", now.getZone().getId());
+        response.addProperty("resultado", "OK");
+        
+        return Response.ok(new Gson().toJson(response)).build();
     }
 }

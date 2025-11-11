@@ -1,0 +1,345 @@
+{
+  "info": {
+    "name": "Firma Digital API",
+    "description": "Colección de peticiones para la API de Firma Digital de Ecuador",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "4.1.0"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "JWT_TOKEN",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+      "type": "string"
+    },
+    {
+      "key": "VERSION_TOKEN",
+      "value": "NDQuMS4w",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Validación y Configuración",
+      "item": [
+        {
+          "name": "Validar Versión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/version",
+              "host": ["{{BASE_URL}}"],
+              "path": ["version"]
+            },
+            "description": "Valida la versión de la aplicación cliente"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Fecha y Hora",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/fecha-hora",
+              "host": ["{{BASE_URL}}"],
+              "path": ["fecha-hora"]
+            },
+            "description": "Obtiene la fecha y hora del servidor en formato ISO-8601"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Certificados",
+      "item": [
+        {
+          "name": "Validar Certificado Digital",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "jwt",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "text"
+                },
+                {
+                  "key": "pkcs12",
+                  "value": "CERTIFICADO_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Certificado PKCS#12 en Base64"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text",
+                  "description": "Contraseña del certificado"
+                },
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/appvalidarcertificadodigital",
+              "host": ["{{BASE_URL}}"],
+              "path": ["appvalidarcertificadodigital"]
+            },
+            "description": "Valida un certificado digital PKCS#12"
+          },
+          "response": []
+        },
+        {
+          "name": "Verificar si Certificado está Revocado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/certificado/revocado/123456789",
+              "host": ["{{BASE_URL}}"],
+              "path": ["certificado", "revocado", "123456789"]
+            },
+            "description": "Verifica si un certificado está revocado usando su número de serie"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Fecha de Revocación",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/certificado/fechaRevocado/123456789",
+              "host": ["{{BASE_URL}}"],
+              "path": ["certificado", "fechaRevocado", "123456789"]
+            },
+            "description": "Obtiene la fecha de revocación de un certificado"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Firma de Documentos",
+      "item": [
+        {
+          "name": "Firmar Documento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "jwt",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "text"
+                },
+                {
+                  "key": "pkcs12",
+                  "value": "CERTIFICADO_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Certificado PKCS#12 en Base64"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text",
+                  "description": "Contraseña del certificado"
+                },
+                {
+                  "key": "documento",
+                  "value": "DOCUMENTO_PDF_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Documento PDF en Base64"
+                },
+                {
+                  "key": "json",
+                  "value": "{\"razon\":\"Firma de aprobación\",\"localizacion\":\"Quito, Ecuador\",\"cargo\":\"Director\"}",
+                  "type": "text",
+                  "description": "Metadatos de la firma en JSON"
+                },
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/appfirmardocumento",
+              "host": ["{{BASE_URL}}"],
+              "path": ["appfirmardocumento"]
+            },
+            "description": "Firma un documento digital con un certificado PKCS#12"
+          },
+          "response": []
+        },
+        {
+          "name": "Firmar Documento (Transversal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "jwt",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "text"
+                },
+                {
+                  "key": "pkcs12",
+                  "value": "CERTIFICADO_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Certificado PKCS#12 en Base64"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text",
+                  "description": "Contraseña del certificado"
+                },
+                {
+                  "key": "documento",
+                  "value": "DOCUMENTO_PDF_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Documento PDF en Base64"
+                },
+                {
+                  "key": "json",
+                  "value": "{\"razon\":\"Firma de aprobación\",\"localizacion\":\"Quito, Ecuador\"}",
+                  "type": "text",
+                  "description": "Metadatos de la firma en JSON"
+                },
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/appfirmardocumentotransversal",
+              "host": ["{{BASE_URL}}"],
+              "path": ["appfirmardocumentotransversal"]
+            },
+            "description": "Firma un documento con firma transversal"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Verificación de Documentos",
+      "item": [
+        {
+          "name": "Verificar Documento Firmado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "jwt",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "text"
+                },
+                {
+                  "key": "documento",
+                  "value": "DOCUMENTO_FIRMADO_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Documento firmado en Base64"
+                },
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/appverificardocumento",
+              "host": ["{{BASE_URL}}"],
+              "path": ["appverificardocumento"]
+            },
+            "description": "Verifica la firma digital de un documento"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

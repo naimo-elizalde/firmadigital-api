@@ -16,56 +16,99 @@
  */
 package ec.gob.firmadigital.api;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Base64;
+import java.util.Properties;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
-import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.core.Form;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 /**
  * Permite validar la versión permitido.
+ * Versión standalone sin dependencias de servicios externos.
  *
  * @author Christian Espinosa, Misael Fernández
  */
 @Path("/version")
 public class ServicioVersion {
 
+    private static final String VERSION_PROPERTY = "version";
+    private static final String CONFIG_FILE = "config.api.properties";
+
     /**
-     * Nombre de la propiedad de sistema que contiene el archivo de
-     * configuracion del servidor WildFly (standalone.xml)
+     * Obtiene la versión de la API desde el archivo de configuración
      */
-    private static final String WS_SYSTEM_PROPERTY = "firmadigital-servicio.url";
-
-    // Servicio REST interno
-    private static final String REST_SERVICE_URL = System.getProperty(WS_SYSTEM_PROPERTY) + "/version";
-
-    @POST
-    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-    @Produces(MediaType.TEXT_PLAIN)
-    public String validarEndpoint(@FormParam("base64") String base64) {
-        try {
-            return buscarVersion(base64);
-        } catch (NotFoundException e) {
-            return "No se encuentra el servidor de búsqueda";
+    private String getVersion() {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
+            if (input == null) {
+                return "4.1.0"; // Versión por defecto
+            }
+            Properties prop = new Properties();
+            prop.load(input);
+            return prop.getProperty(VERSION_PROPERTY, "4.1.0");
+        } catch (IOException e) {
+            return "4.1.0";
         }
     }
 
-    private String buscarVersion(String base64) throws NotFoundException {
-        try (Client client = ClientBuilder.newClient()) {
-            WebTarget target = client.target(REST_SERVICE_URL);
-            Invocation.Builder builder = target.request();
-            Form form = new Form();
-            form.param("base64", base64);
-            Invocation invocation = builder.buildPost(Entity.form(form));
-            return invocation.invoke(String.class);
+    /**
+     * Valida la versión del cliente comparándola con la versión del servidor
+     */
+    @POST
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.APPLICATION_JSON)
+    public String validarEndpoint(@FormParam("base64") String base64) {
+        try {
+            String versionServidor = getVersion();
+            String versionCliente = null;
+            
+            // Decodificar la versión del cliente si viene en base64
+            if (base64 != null && !base64.isEmpty()) {
+                try {
+                    versionCliente = new String(Base64.getDecoder().decode(base64));
+                } catch (IllegalArgumentException e) {
+                    // Si no es base64 válido, usar como está
+                    versionCliente = base64;
+                }
+            }
+            
+            // Crear respuesta JSON
+            JsonObject response = new JsonObject();
+            response.addProperty("resultado", "Version enabled");
+            response.addProperty("versionServidor", versionServidor);
+            
+            if (versionCliente != null) {
+                response.addProperty("versionCliente", versionCliente);
+                response.addProperty("compatible", versionServidor.equals(versionCliente));
+            }
+            
+            return new Gson().toJson(response);
+            
+        } catch (Exception e) {
+            JsonObject error = new JsonObject();
+            error.addProperty("resultado", "ERROR");
+            error.addProperty("mensaje", "Error al validar versión: " + e.getMessage());
+            return new Gson().toJson(error);
         }
+    }
+
+    /**
+     * Endpoint GET para obtener la versión directamente
+     */
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getVersionInfo() {
+        JsonObject response = new JsonObject();
+        response.addProperty("version", getVersion());
+        response.addProperty("resultado", "OK");
+        return Response.ok(new Gson().toJson(response)).build();
     }
 }
