@@ -120,7 +120,10 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
             LOGGER.log(Level.INFO, "Iniciando firma del documento");
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
             PadesBasic padesSigner = new PadesBasic(signer);
-            byte[] documentoFirmado = padesSigner.sign(docBytes, certChain, params);
+            
+            // Convertir byte[] a InputStream para el método sign
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(docBytes);
+            byte[] documentoFirmado = padesSigner.sign(inputStream, signer, certChain, params);
             
             // 6. Codificar y retornar
             String documentoFirmadoBase64 = Base64.getEncoder().encodeToString(documentoFirmado);

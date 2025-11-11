@@ -94,7 +94,9 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
             
             for (SignInfo signInfo : firmas) {
                 try {
-                    X509Certificate cert = signInfo.getCertificate();
+                    // getCerts() retorna un array, el primer elemento es el certificado del firmante
+                    X509Certificate[] certs = signInfo.getCerts();
+                    X509Certificate cert = certs[0];
                     
                     JsonObject firmaObj = new JsonObject();
                     firmaObj.addProperty("numeroFirma", firmaIndex++);
