@@ -1,0 +1,43 @@
+# Archivos y directorios a excluir del contexto de Docker
+# Esto optimiza el tiempo de build
+
+# Maven
+**/target/
+**/.mvn/
+**/mvnw
+**/mvnw.cmd
+
+# IDE
+**/.idea/
+**/.vscode/
+**/.settings/
+**/.classpath
+**/.project
+**/.factorypath
+**/*.iml
+**/*.iws
+**/*.ipr
+**/nbactions.xml
+**/nb-configuration.xml
+
+# Git
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Logs
+**/*.log
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Documentation
+**/*.md
+**/*.adoc
+**/LICENSE
+
+# Docker
+**/Dockerfile
+**/.dockerignore
+**/docker-compose.yml

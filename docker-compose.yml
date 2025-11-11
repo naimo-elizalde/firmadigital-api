@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  firmadigital-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firmadigital-api
+    ports:
+      - "8080:8080"    # Puerto HTTP para la API
+      - "9990:9990"    # Puerto de administración WildFly (opcional)
+    environment:
+      # Variables de entorno para configuración
+      - JAVA_OPTS=-Xms512m -Xmx2048m -XX:MetaspaceSize=96M -XX:MaxMetaspaceSize=256m
+    volumes:
+      # Volumen opcional para logs persistentes
+      - ./logs:/opt/jboss/wildfly/standalone/log
+    restart: unless-stopped
+    networks:
+      - firmadigital-network
+
+networks:
+  firmadigital-network:
+    driver: bridge
