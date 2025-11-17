@@ -18,6 +18,7 @@ package ec.gob.firmadigital.api;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import ec.gob.firmadigital.api.security.Secured;
 import ec.gob.firmadigital.libreria.sign.DigestAlgorithm;
 import ec.gob.firmadigital.libreria.sign.PrivateKeySigner;
 import ec.gob.firmadigital.libreria.sign.pdf.PadesBasic;
@@ -49,6 +50,7 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
     private static final Logger LOGGER = Logger.getLogger(ServicioAppFirmarDocumento.class.getName());
 
     @POST
+    @Secured
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     public String firmarDocumento(

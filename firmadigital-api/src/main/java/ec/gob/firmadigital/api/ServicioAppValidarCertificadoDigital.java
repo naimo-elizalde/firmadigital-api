@@ -18,6 +18,7 @@ package ec.gob.firmadigital.api;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import ec.gob.firmadigital.api.security.Secured;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.POST;
@@ -48,6 +49,7 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
     private static final Logger LOGGER = Logger.getLogger(ServicioAppValidarCertificadoDigital.class.getName());
 
     @POST
+    @Secured
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     public String validarCertificado(

@@ -1,0 +1,41 @@
+# Archivos y directorios a ignorar en Git
+
+# Archivos de entorno con secretos
+.env
+.env.local
+.env.*.local
+
+# Archivos de configuración con secretos
+config.*.secret
+secrets/
+*.secret
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Build
+target/
+build/
+dist/
+*.class
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Certificados y claves privadas
+*.p12
+*.pfx
+*.key
+*.pem
+*.crt
+*.cer

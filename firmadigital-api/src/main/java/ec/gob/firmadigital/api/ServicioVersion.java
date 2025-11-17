@@ -18,6 +18,7 @@ package ec.gob.firmadigital.api;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import ec.gob.firmadigital.api.security.Secured;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Base64;
@@ -63,6 +64,7 @@ public class ServicioVersion {
      * Valida la versión del cliente comparándola con la versión del servidor
      */
     @POST
+    @Secured
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
     public String validarEndpoint(@FormParam("base64") String base64) {
@@ -104,6 +106,7 @@ public class ServicioVersion {
      * Endpoint GET para obtener la versión directamente
      */
     @GET
+    @Secured
     @Produces(MediaType.APPLICATION_JSON)
     public Response getVersionInfo() {
         JsonObject response = new JsonObject();
