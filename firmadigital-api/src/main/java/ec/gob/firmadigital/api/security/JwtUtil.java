@@ -114,9 +114,15 @@ public class JwtUtil {
             return false;
         }
         
+        LOGGER.log(Level.INFO, "=== JwtUtil.validateToken - Iniciando validación ===");
+        LOGGER.log(Level.INFO, "Token (primeros 30 chars): {0}...", token.substring(0, Math.min(30, token.length())));
+        
         try {
             // Limpiar el token (remover "Bearer " si existe)
             token = cleanToken(token);
+            
+            LOGGER.log(Level.INFO, "Token después de limpiar: {0}...", token.substring(0, Math.min(30, token.length())));
+            LOGGER.log(Level.INFO, "SecretKey presente: {0}", secretKey != null ? "SÍ" : "NO");
             
             // Parsear y validar el token
             Claims claims = Jwts.parser()
@@ -125,24 +131,35 @@ public class JwtUtil {
                     .parseSignedClaims(token)
                     .getPayload();
             
+            LOGGER.log(Level.INFO, "Claims extraídos exitosamente");
+            LOGGER.log(Level.INFO, "Subject: {0}", claims.getSubject());
+            LOGGER.log(Level.INFO, "ID: {0}", claims.getId());
+            LOGGER.log(Level.INFO, "Expiration: {0}", claims.getExpiration());
+            
             // Verificar expiración
             Date expiration = claims.getExpiration();
             if (expiration != null && expiration.before(new Date())) {
-                LOGGER.log(Level.WARNING, "Token expirado");
+                LOGGER.log(Level.WARNING, "✗ Token expirado. Fecha exp: {0}, Fecha actual: {1}", 
+                          new Object[]{expiration, new Date()});
                 return false;
             }
             
-            LOGGER.log(Level.FINE, "Token validado correctamente para subject: {0}", claims.getSubject());
+            LOGGER.log(Level.INFO, "✓ Token validado correctamente para subject: {0}", claims.getSubject());
             return true;
             
         } catch (ExpiredJwtException e) {
-            LOGGER.log(Level.WARNING, "Token expirado: {0}", e.getMessage());
+            LOGGER.log(Level.WARNING, "✗ Token expirado: {0}", e.getMessage());
+            LOGGER.log(Level.WARNING, "Claims: {0}", e.getClaims());
             return false;
         } catch (JwtException e) {
-            LOGGER.log(Level.WARNING, "Token inválido: {0}", e.getMessage());
+            LOGGER.log(Level.WARNING, "✗ Token inválido (JwtException): {0}", e.getMessage());
+            LOGGER.log(Level.WARNING, "Causa: {0}", e.getCause());
+            e.printStackTrace();
             return false;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error al validar token: {0}", e.getMessage());
+            LOGGER.log(Level.SEVERE, "✗ Error al validar token: {0}", e.getMessage());
+            LOGGER.log(Level.SEVERE, "Clase de excepción: {0}", e.getClass().getName());
+            e.printStackTrace();
             return false;
         }
     }

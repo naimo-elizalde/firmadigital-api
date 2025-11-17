@@ -54,35 +54,44 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
     
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
+        String requestPath = requestContext.getUriInfo().getPath();
+        LOGGER.log(Level.INFO, "=== JWT Filter - Validando petición a: {0}", requestPath);
+        
         // Intentar obtener el token del header Authorization
         String authHeader = requestContext.getHeaderString("Authorization");
         String token = null;
         
+        LOGGER.log(Level.INFO, "Authorization header: {0}", authHeader != null ? "Presente" : "Ausente");
+        
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            LOGGER.log(Level.FINE, "Token JWT encontrado en header Authorization");
+            LOGGER.log(Level.INFO, "✓ Token JWT encontrado en header Authorization (primeros 20 chars): {0}...", 
+                      token.substring(0, Math.min(20, token.length())));
         } else {
+            LOGGER.log(Level.INFO, "Token no encontrado en header, intentando body...");
             // Si no está en el header, intentar obtenerlo del cuerpo de la petición
             token = extractTokenFromBody(requestContext);
         }
         
         // Validar el token
         if (token == null || token.isEmpty()) {
-            LOGGER.log(Level.WARNING, "Token JWT no proporcionado");
+            LOGGER.log(Level.WARNING, "✗ Token JWT no proporcionado en header ni body");
             abortRequest(requestContext, "Token JWT no proporcionado", Response.Status.UNAUTHORIZED);
             return;
         }
         
+        LOGGER.log(Level.INFO, "Validando token con JwtUtil...");
+        
         // Validar el token usando JwtUtil
         if (!JwtUtil.validateToken(token)) {
-            LOGGER.log(Level.WARNING, "Token JWT inválido o expirado");
+            LOGGER.log(Level.WARNING, "✗ Token JWT inválido o expirado");
             abortRequest(requestContext, "Token JWT inválido o expirado", Response.Status.UNAUTHORIZED);
             return;
         }
         
         // Token válido - continuar con la petición
         String subject = JwtUtil.getSubjectFromToken(token);
-        LOGGER.log(Level.INFO, "Token JWT validado correctamente para: {0}", subject);
+        LOGGER.log(Level.INFO, "✓ Token JWT validado correctamente para subject: {0}", subject);
         
         // Opcionalmente, agregar información del usuario al contexto
         requestContext.setProperty("jwt.subject", subject);
