@@ -58,14 +58,15 @@ public class JwtUtil {
                     "JWT_SECRET no está configurado. Por favor, configure la variable de entorno JWT_SECRET"
                 );
             }
-            byte[] keyBytes = Base64.getDecoder().decode(secret);
+            // Usar el secret directamente como UTF-8 (compatible con NestJS/Node.js)
+            byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             secretKey = Keys.hmacShaKeyFor(keyBytes);
-            LOGGER.log(Level.INFO, "JWT secret key inicializada correctamente desde variable de entorno");
+            LOGGER.log(Level.INFO, "JWT secret key inicializada correctamente desde variable de entorno (UTF-8)");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "CRÍTICO: No se pudo inicializar JWT secret key: {0}", e.getMessage());
             throw new RuntimeException(
                 "No se puede iniciar la aplicación sin JWT_SECRET configurado. " +
-                "Configure la variable de entorno JWT_SECRET con una clave Base64 válida.", e
+                "Configure la variable de entorno JWT_SECRET con una clave de al menos 256 bits.", e
             );
         }
     }
@@ -98,19 +99,14 @@ public class JwtUtil {
         // Log de los primeros caracteres para debug (sin exponer todo el secreto)
         LOGGER.log(Level.INFO, "JWT_SECRET encontrado (primeros 10 chars): {0}...", 
                   secret.substring(0, Math.min(10, secret.length())));
+        LOGGER.log(Level.INFO, "JWT_SECRET longitud: {0} caracteres", secret.length());
         
-        // Validar que sea Base64 válido
-        try {
-            byte[] decoded = Base64.getDecoder().decode(secret);
-            if (decoded.length < 32) {
-                LOGGER.log(Level.SEVERE, 
-                    "La clave JWT debe tener al menos 256 bits (32 bytes). Longitud actual: {0} bytes",
-                    decoded.length
-                );
-                return null;
-            }
-        } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE, "JWT_SECRET no es una cadena Base64 válida");
+        // Validar longitud mínima (256 bits = 32 bytes = 32 caracteres para UTF-8)
+        if (secret.length() < 32) {
+            LOGGER.log(Level.SEVERE, 
+                "La clave JWT debe tener al menos 32 caracteres (256 bits). Longitud actual: {0} caracteres",
+                secret.length()
+            );
             return null;
         }
         
