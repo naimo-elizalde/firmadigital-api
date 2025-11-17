@@ -54,12 +54,10 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     public String firmarDocumento(
-            @FormParam("jwt") String jwt,
             @FormParam("pkcs12") String pkcs12Base64,
             @FormParam("password") String password,
             @FormParam("documento") String documentoBase64,
-            @FormParam("json") String jsonMetadata,
-            @FormParam("base64") String base64Version
+            @FormParam("json") String jsonMetadata
     ) {
         LOGGER.log(Level.INFO, "Iniciando proceso de firma de documento");
         

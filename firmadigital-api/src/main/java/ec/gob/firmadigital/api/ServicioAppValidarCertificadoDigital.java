@@ -53,10 +53,8 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     public String validarCertificado(
-            @FormParam("jwt") String jwt,
             @FormParam("pkcs12") String pkcs12Base64,
-            @FormParam("password") String password,
-            @FormParam("base64") String base64Version
+            @FormParam("password") String password
     ) {
         LOGGER.log(Level.INFO, "Iniciando validación de certificado digital");
         

@@ -52,9 +52,7 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     public String verificarDocumento(
-            @FormParam("jwt") String jwt,
-            @FormParam("documento") String documentoBase64,
-            @FormParam("base64") String base64Version
+            @FormParam("documento") String documentoBase64
     ) {
         LOGGER.log(Level.INFO, "Iniciando verificación de documento firmado");
         
