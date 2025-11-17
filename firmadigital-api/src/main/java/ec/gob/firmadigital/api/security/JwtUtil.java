@@ -71,18 +71,33 @@ public class JwtUtil {
     }
     
     /**
-     * Carga el secreto JWT desde la variable de entorno
+     * Carga el secreto JWT desde la variable de entorno o system property
      */
     private static String loadSecretFromEnvironment() {
+        // Intentar primero desde variable de entorno
         String secret = System.getenv(JWT_SECRET_ENV_VAR);
+        
+        // Si no está en variable de entorno, intentar system property
+        if (secret == null || secret.trim().isEmpty()) {
+            secret = System.getProperty(JWT_SECRET_ENV_VAR);
+            if (secret != null) {
+                LOGGER.log(Level.INFO, "JWT_SECRET cargado desde System Property");
+            }
+        } else {
+            LOGGER.log(Level.INFO, "JWT_SECRET cargado desde variable de entorno");
+        }
         
         if (secret == null || secret.trim().isEmpty()) {
             LOGGER.log(Level.SEVERE, 
-                "Variable de entorno {0} no configurada. La aplicación no puede procesar tokens JWT.",
+                "Variable de entorno o System Property {0} no configurada. La aplicación no puede procesar tokens JWT.",
                 JWT_SECRET_ENV_VAR
             );
             return null;
         }
+        
+        // Log de los primeros caracteres para debug (sin exponer todo el secreto)
+        LOGGER.log(Level.INFO, "JWT_SECRET encontrado (primeros 10 chars): {0}...", 
+                  secret.substring(0, Math.min(10, secret.length())));
         
         // Validar que sea Base64 válido
         try {
