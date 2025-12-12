@@ -22,7 +22,6 @@ import ec.gob.firmadigital.api.security.Secured;
 import ec.gob.firmadigital.libreria.sign.DigestAlgorithm;
 import ec.gob.firmadigital.libreria.sign.PrivateKeySigner;
 import ec.gob.firmadigital.libreria.sign.pdf.PadesBasic;
-import ec.gob.firmadigital.libreria.utils.QRCode;
 
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
@@ -31,49 +30,30 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
-import com.itextpdf.kernel.geom.Rectangle;
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfPage;
-import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
-import com.itextpdf.kernel.font.PdfFont;
-import com.itextpdf.io.image.ImageDataFactory;
-import com.itextpdf.layout.Canvas;
-import com.itextpdf.layout.element.Div;
-import com.itextpdf.layout.element.Image;
-import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Text;
-import com.itextpdf.layout.properties.HorizontalAlignment;
-import com.itextpdf.layout.properties.VerticalAlignment;
-
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.text.SimpleDateFormat;
 import java.util.Base64;
-import java.util.Date;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static ec.gob.firmadigital.libreria.utils.Utils.loadFont;
-
 /**
- * REST Web Service para firmar documentos PDF con estampado QR previo.
- * Este servicio primero agrega un estampado visual con QR al documento
- * y luego lo firma digitalmente.
+ * REST Web Service para firmar documentos PDF con estampado QR.
+ * Este servicio usa la librería de firma digital con soporte nativo de QR
+ * a través del parámetro typeSig="QR" y los parámetros infoQR y de posición.
  *
+ * @author Luis González
+ */
 @Path("/appfirmardocumentoconqr")
 public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
 
     private static final Logger LOGGER = Logger.getLogger(ServicioAppFirmarDocumentoConQR.class.getName());
 
     /**
-     * Firma un documento PDF agregando primero un estampado visual con QR.
+     * Firma un documento PDF con estampado visual QR usando la librería.
      * 
      * @param pkcs12Base64 Certificado PKCS#12 codificado en Base64
      * @param password Contraseña del certificado
@@ -143,16 +123,11 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             LOGGER.log(Level.INFO, "Decodificando documento PDF");
             byte[] docBytes = decodificarBase64(documentoBase64);
             
-            // 4. Parsear metadatos (si existen)
+            // 4. Parsear metadatos y configurar parámetros de firma con QR
             Properties params = new Properties();
             String razon = "Firma digital";
             String localizacion = "Ecuador";
             String infoQR = "";
-            int qrPagina = -1; // -1 = última página
-            float qrPosX = 50f;
-            float qrPosY = 50f;
-            float qrAncho = 200f;
-            float qrAlto = 100f;
             
             if (jsonMetadata != null && !jsonMetadata.isEmpty()) {
                 try {
@@ -171,63 +146,66 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
                         params.setProperty("cargo", metadata.get("cargo").getAsString());
                     }
                     
-                    // Metadatos de estampado QR
+                    // Configurar firma con QR usando parámetros de la librería
+                    params.setProperty("typeSig", "QR");
+                    
+                    // Metadatos del QR
                     if (metadata.has("infoQR")) {
                         infoQR = metadata.get("infoQR").getAsString();
+                        params.setProperty("infoQR", infoQR);
                     }
+                    
+                    // Posición y tamaño del QR
                     if (metadata.has("qrPagina")) {
-                        qrPagina = metadata.get("qrPagina").getAsInt();
+                        int qrPagina = metadata.get("qrPagina").getAsInt();
+                        if (qrPagina > 0) {
+                            params.setProperty("signaturePage", String.valueOf(qrPagina));
+                        } else {
+                            params.setProperty("signatureLastPage", "true");
+                        }
+                    } else {
+                        params.setProperty("signatureLastPage", "true");
                     }
+                    
                     if (metadata.has("qrPosX")) {
-                        qrPosX = metadata.get("qrPosX").getAsFloat();
+                        params.setProperty("signaturePositionOnPageLowerLeftX", String.valueOf(metadata.get("qrPosX").getAsFloat()));
                     }
                     if (metadata.has("qrPosY")) {
-                        qrPosY = metadata.get("qrPosY").getAsFloat();
+                        params.setProperty("signaturePositionOnPageLowerLeftY", String.valueOf(metadata.get("qrPosY").getAsFloat()));
                     }
                     if (metadata.has("qrAncho")) {
-                        qrAncho = metadata.get("qrAncho").getAsFloat();
+                        params.setProperty("signaturePositionOnPageWidth", String.valueOf(metadata.get("qrAncho").getAsFloat()));
                     }
                     if (metadata.has("qrAlto")) {
-                        qrAlto = metadata.get("qrAlto").getAsFloat();
+                        params.setProperty("signaturePositionOnPageHeight", String.valueOf(metadata.get("qrAlto").getAsFloat()));
                     }
                     
                     LOGGER.log(Level.INFO, "Metadatos procesados: {0}", metadata);
                 } catch (Exception e) {
                     LOGGER.log(Level.WARNING, "Error al parsear metadatos JSON, se usarán valores por defecto: {0}", e.getMessage());
                 }
+            } else {
+                // Valores por defecto para firma con QR
+                params.setProperty("typeSig", "QR");
+                params.setProperty("signatureLastPage", "true");
             }
             
-            // 5. PRIMERO: Agregar estampado visual con QR
-            LOGGER.log(Level.INFO, "Agregando estampado visual con QR al documento");
-            byte[] documentoEstampado = agregarEstampadoQR(
-                docBytes, 
-                nombreFirmante, 
-                razon, 
-                localizacion, 
-                infoQR,
-                qrPagina,
-                qrPosX,
-                qrPosY,
-                qrAncho,
-                qrAlto
-            );
-            
-            // 6. SEGUNDO: Firmar digitalmente el documento estampado
-            LOGGER.log(Level.INFO, "Iniciando firma digital del documento estampado");
+            // 5. Firmar digitalmente el documento con QR (la librería maneja todo)
+            LOGGER.log(Level.INFO, "Iniciando firma digital del documento con QR");
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
             PadesBasic padesSigner = new PadesBasic(signer);
             
             // Convertir byte[] a InputStream para el método sign
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(documentoEstampado);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(docBytes);
             byte[] documentoFirmado = padesSigner.sign(inputStream, signer, certChain, params);
             
-            // 7. Codificar y retornar
+            // 6. Codificar y retornar
             String documentoFirmadoBase64 = Base64.getEncoder().encodeToString(documentoFirmado);
-            LOGGER.log(Level.INFO, "Documento estampado y firmado exitosamente");
+            LOGGER.log(Level.INFO, "Documento firmado con QR exitosamente");
             
             JsonObject response = new JsonObject();
             response.addProperty("resultado", "OK");
-            response.addProperty("mensaje", "Documento estampado con QR y firmado digitalmente exitosamente");
+            response.addProperty("mensaje", "Documento firmado con QR exitosamente");
             response.addProperty("documentoFirmado", documentoFirmadoBase64);
             
             return new Gson().toJson(response);
@@ -244,74 +222,6 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
         }
     }
     
-    /**
-     * Agrega un estampado visual con QR al documento PDF.
-     */
-    private byte[] agregarEstampadoQR( usando la clase QrAppereance de la librería.
-     */
-    private byte[] agregarEstampadoQR(
-            byte[] pdfBytes,
-            String nombreFirmante,
-            String razon,
-            String localizacion,
-            String infoQR,
-            int numeroPagina,
-            float posX,
-            float posY,
-            float ancho,
-            float alto
-    ) throws Exception {
-        
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(pdfBytes);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        
-        PdfReader reader = new PdfReader(inputStream);
-        PdfWriter writer = new PdfWriter(outputStream);
-        PdfDocument pdfDoc = new PdfDocument(reader, writer);
-        
-        // Determinar página donde agregar el estampado
-        int totalPaginas = pdfDoc.getNumberOfPages();
-        int paginaDestino = (numeroPagina <= 0 || numeroPagina > totalPaginas) ? totalPaginas : numeroPagina;
-        
-        LOGGER.log(Level.INFO, "Total de páginas: {0}, Página destino para QR: {1}", new Object[]{totalPaginas, paginaDestino});
-        
-        // Generar fecha/hora actual
-        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-        String fechaHora = sdf.format(new Date());
-        
-        // Crear instancia de QrAppereance de la librería
-        QrAppereance qrAppearance = new QrAppereance(nombreFirmante, razon, localizacion, fechaHora, infoQR);
-        
-        // Crear un PdfSigner temporal para obtener PdfSignatureAppearance
-        // Cerramos el documento anterior y abrimos uno nuevo con PdfSigner
-        pdfDoc.close();
-        
-        // Reabrir para usar con PdfSigner
-        ByteArrayInputStream signInputStream = new ByteArrayInputStream(pdfBytes);
-        ByteArrayOutputStream signOutputStream = new ByteArrayOutputStream();
-        
-        PdfReader signReader = new PdfReader(signInputStream);
-        PdfSigner pdfSigner = new PdfSigner(signReader, signOutputStream, false);
-        
-        // Configurar la apariencia visual
-        PdfSignatureAppearance appearance = pdfSigner.getSignatureAppearance();
-        Rectangle rect = new Rectangle(posX, posY, ancho, alto);
-        
-        // Usar la clase QrAppereance de la librería para crear la apariencia
-        PdfDocument signPdfDoc = pdfSigner.getDocument();
-        qrAppearance.createCustomAppearance(appearance, paginaDestino, signPdfDoc, rect);
-        
-        // Crear un FormXObject con la apariencia y agregarlo al documento
-        // En lugar de firmar, solo agregamos el visual
-        PdfFormXObject form = appearance.getLayer2();
-        
-        // Cerrar el pdfSigner sin firmar y obtener el documento con la apariencia
-        signPdfDoc.close();
-        
-        LOGGER.log(Level.INFO, "Estampado QR agregado en página {0} en posición ({1}, {2})", 
-                   new Object[]{paginaDestino, posX, posY});
-        
-        return signO
     /**
      * Extrae el nombre común (CN) del certificado.
      */
