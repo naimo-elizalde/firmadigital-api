@@ -19,7 +19,7 @@ package ec.gob.firmadigital.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import ec.gob.firmadigital.api.security.Secured;
-import ec.gob.firmadigital.libreria.sign.pdf.appearance.QrAppereance;
+import ec.gob.firmadigital.libreria.utils.QRCode;
 
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
@@ -30,11 +30,19 @@ import jakarta.ws.rs.core.MediaType;
 
 import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.kernel.pdf.xobject.PdfFormXObject;
-import com.itextpdf.signatures.PdfSignatureAppearance;
-import com.itextpdf.signatures.PdfSigner;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.layout.Canvas;
+import com.itextpdf.layout.element.Div;
+import com.itextpdf.layout.element.Image;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Text;
+import com.itextpdf.layout.properties.HorizontalAlignment;
+import com.itextpdf.layout.properties.VerticalAlignment;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -43,6 +51,8 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static ec.gob.firmadigital.libreria.utils.Utils.loadFont;
 
 /**
  * REST Web Service para agregar estampado visual con QR a documentos PDF.
@@ -183,37 +193,82 @@ public class ServicioAppEstampadoQR extends RequestSizeFilter {
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
         String fechaHora = sdf.format(new Date());
         
-        // Crear instancia de QrAppereance de la librería
-        QrAppereance qrAppearance = new QrAppereance(nombreFirmante, razon, localizacion, fechaHora, infoQR);
+        // Obtener la página donde se agregará el estampado
+        PdfPage page = pdfDoc.getPage(paginaDestino);
+        PdfCanvas pdfCanvas = new PdfCanvas(page);
         
-        // Cerrar el documento actual
+        // Generar código QR usando la utilidad de la librería
+        String textoQR = "FIRMADO POR: " + nombreFirmante.trim() + "\n";
+        textoQR = textoQR + "RAZON: " + razon + "\n";
+        textoQR = textoQR + "LOCALIZACION: " + localizacion + "\n";
+        textoQR = textoQR + "FECHA: " + fechaHora + "\n";
+        if (infoQR != null && !infoQR.isEmpty()) {
+            textoQR = textoQR + infoQR;
+        }
+        
+        byte[] byteQR = QRCode.generateQR(textoQR, (int)alto, (int)alto);
+        
+        // Cargar fuentes
+        PdfFont fontCourier = loadFont("fonts/courier.ttf");
+        PdfFont fontCourierBold = loadFont("fonts/courier-bold.ttf");
+        
+        // Crear el área para el QR (cuadrado con el alto)
+        float qrWidth = alto;  // El QR es cuadrado
+        Rectangle qrRect = new Rectangle(posX, posY, qrWidth, alto);
+        
+        // Crear el área para el texto (resto del ancho)
+        float textX = posX + qrWidth;
+        float textWidth = ancho - qrWidth;
+        Rectangle textRect = new Rectangle(textX, posY, textWidth, alto);
+        
+        // Agregar imagen QR
+        try (Canvas qrCanvas = new Canvas(pdfCanvas, qrRect)) {
+            Div imageDiv = new Div();
+            imageDiv.setHeight(alto);
+            imageDiv.setWidth(qrWidth);
+            imageDiv.setVerticalAlignment(VerticalAlignment.MIDDLE);
+            imageDiv.setHorizontalAlignment(HorizontalAlignment.CENTER);
+            
+            Image image = new Image(ImageDataFactory.create(byteQR));
+            image.setAutoScale(true);
+            imageDiv.add(image);
+            
+            qrCanvas.add(imageDiv);
+        }
+        
+        // Agregar texto informativo
+        try (Canvas textCanvas = new Canvas(pdfCanvas, textRect)) {
+            Div textDiv = new Div();
+            textDiv.setHeight(alto);
+            textDiv.setWidth(textWidth);
+            textDiv.setVerticalAlignment(VerticalAlignment.MIDDLE);
+            textDiv.setHorizontalAlignment(HorizontalAlignment.LEFT);
+            
+            Text texto = new Text("Firmado electrónicamente por:\n");
+            Paragraph paragraph = new Paragraph().add(texto).setFont(fontCourier).setMargin(0)
+                    .setMultipliedLeading(0.9f).setFontSize(3.25f);
+            textDiv.add(paragraph);
+            
+            Text contenido = new Text(nombreFirmante.trim());
+            paragraph = new Paragraph().add(contenido).setFont(fontCourierBold).setMargin(0)
+                    .setMultipliedLeading(0.9f).setFontSize(6.25f);
+            textDiv.add(paragraph);
+            
+            Text info = new Text("\nValidar únicamente con Nexus Soluciones");
+            paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0)
+                    .setMultipliedLeading(0.9f).setFontSize(3.25f);
+            textDiv.add(paragraph);
+            
+            textCanvas.add(textDiv);
+        }
+        
+        // Cerrar documento
         pdfDoc.close();
-        
-        // Reabrir para usar con PdfSigner y crear la apariencia visual
-        ByteArrayInputStream signInputStream = new ByteArrayInputStream(pdfBytes);
-        ByteArrayOutputStream signOutputStream = new ByteArrayOutputStream();
-        
-        PdfReader signReader = new PdfReader(signInputStream);
-        PdfSigner pdfSigner = new PdfSigner(signReader, signOutputStream, false);
-        
-        // Configurar la apariencia visual
-        PdfSignatureAppearance appearance = pdfSigner.getSignatureAppearance();
-        Rectangle rect = new Rectangle(posX, posY, ancho, alto);
-        
-        // Usar la clase QrAppereance de la librería para crear la apariencia
-        PdfDocument signPdfDoc = pdfSigner.getDocument();
-        qrAppearance.createCustomAppearance(appearance, paginaDestino, signPdfDoc, rect);
-        
-        // Crear un FormXObject con la apariencia
-        PdfFormXObject form = appearance.getLayer2();
-        
-        // Cerrar el documento sin firmar (solo con la apariencia visual)
-        signPdfDoc.close();
         
         LOGGER.log(Level.INFO, "Estampado QR agregado en página {0} en posición ({1}, {2})", 
                    new Object[]{paginaDestino, posX, posY});
         
-        return signOutputStream.toByteArray();
+        return outputStream.toByteArray();
     }
     
     private String crearRespuestaError(String mensaje) {

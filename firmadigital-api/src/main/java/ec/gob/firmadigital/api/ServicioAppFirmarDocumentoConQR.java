@@ -22,7 +22,7 @@ import ec.gob.firmadigital.api.security.Secured;
 import ec.gob.firmadigital.libreria.sign.DigestAlgorithm;
 import ec.gob.firmadigital.libreria.sign.PrivateKeySigner;
 import ec.gob.firmadigital.libreria.sign.pdf.PadesBasic;
-import ec.gob.firmadigital.libreria.sign.pdf.appearance.QrAppereance;
+import ec.gob.firmadigital.libreria.utils.QRCode;
 
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
@@ -33,11 +33,19 @@ import jakarta.ws.rs.core.MediaType;
 
 import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfPage;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.kernel.pdf.xobject.PdfFormXObject;
-import com.itextpdf.signatures.PdfSignatureAppearance;
-import com.itextpdf.signatures.PdfSigner;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.layout.Canvas;
+import com.itextpdf.layout.element.Div;
+import com.itextpdf.layout.element.Image;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Text;
+import com.itextpdf.layout.properties.HorizontalAlignment;
+import com.itextpdf.layout.properties.VerticalAlignment;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
