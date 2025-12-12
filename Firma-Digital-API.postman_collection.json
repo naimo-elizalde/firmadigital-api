@@ -293,6 +293,64 @@
             "description": "Firma un documento con firma transversal"
           },
           "response": []
+        },
+        {
+          "name": "Firmar Documento con QR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "jwt",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "text"
+                },
+                {
+                  "key": "pkcs12",
+                  "value": "CERTIFICADO_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Certificado PKCS#12 en Base64"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text",
+                  "description": "Contraseña del certificado"
+                },
+                {
+                  "key": "documento",
+                  "value": "DOCUMENTO_PDF_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Documento PDF en Base64"
+                },
+                {
+                  "key": "json",
+                  "value": "{\"razon\":\"Firma de aprobación\",\"localizacion\":\"Quito, Ecuador\",\"infoQR\":\"https://verificacion.gob.ec/doc/12345\",\"qrPosX\":50,\"qrPosY\":50,\"qrAncho\":200,\"qrAlto\":100}",
+                  "type": "text",
+                  "description": "Metadatos de la firma y del QR en JSON. Incluye: razon, localizacion, infoQR (URL o texto adicional), qrPagina, qrPosX, qrPosY, qrAncho, qrAlto"
+                },
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/appfirmardocumentoconqr",
+              "host": ["{{BASE_URL}}"],
+              "path": ["appfirmardocumentoconqr"]
+            },
+            "description": "Firma un documento PDF agregando primero un estampado visual con código QR. El QR contiene información del firmante, razón, localización, fecha y URL de verificación. Luego firma digitalmente el documento estampado."
+          },
+          "response": []
         }
       ]
     },
@@ -336,6 +394,57 @@
               "path": ["appverificardocumento"]
             },
             "description": "Verifica la firma digital de un documento"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Estampado Visual",
+      "item": [
+        {
+          "name": "Estampar QR sin Firma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "jwt",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "text"
+                },
+                {
+                  "key": "documento",
+                  "value": "DOCUMENTO_PDF_BASE64_AQUI",
+                  "type": "text",
+                  "description": "Documento PDF en Base64"
+                },
+                {
+                  "key": "json",
+                  "value": "{\"nombreFirmante\":\"Juan Pérez García\",\"razon\":\"Documento verificado\",\"localizacion\":\"Quito, Ecuador\",\"infoQR\":\"https://verificacion.gob.ec/doc/12345\",\"pagina\":1,\"posX\":50,\"posY\":50,\"ancho\":200,\"alto\":100}",
+                  "type": "text",
+                  "description": "Metadatos del estampado en JSON. Incluye: nombreFirmante (requerido), razon, localizacion, infoQR, pagina, posX, posY, ancho, alto"
+                },
+                {
+                  "key": "base64",
+                  "value": "{{VERSION_TOKEN}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/appestampadoqr",
+              "host": ["{{BASE_URL}}"],
+              "path": ["appestampadoqr"]
+            },
+            "description": "Agrega un estampado visual con código QR a un documento PDF sin firmarlo digitalmente. Útil para agregar marcas visuales de verificación o tracking."
           },
           "response": []
         }

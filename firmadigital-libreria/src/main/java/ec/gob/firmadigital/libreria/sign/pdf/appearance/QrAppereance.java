@@ -124,7 +124,7 @@ public class QrAppereance implements CustomAppearance {
                 .setFontSize(6.25f);
         textDiv.add(paragraph);
 
-        Text info = new Text("\nValidar únicamente con FirmaEC");
+        Text info = new Text("\nValidar únicamente con Nexus Soluciones\n");
         paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
                 .setFontSize(3.25f);
         textDiv.add(paragraph);
