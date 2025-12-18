@@ -159,7 +159,7 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
                     if (metadata.has("qrPagina")) {
                         int qrPagina = metadata.get("qrPagina").getAsInt();
                         if (qrPagina > 0) {
-                            params.setProperty("lastPage", String.valueOf(qrPagina));
+                            params.setProperty("page", String.valueOf(qrPagina));
                         }
                     }
                     
@@ -184,10 +184,12 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             }
             
             // Configurar posición del QR usando los nombres correctos de la librería
+            // La esquina inferior izquierda es (qrPosX, qrPosY)
+            // La esquina superior derecha es (qrPosX + qrAncho, qrPosY + qrAlto)
             params.setProperty("PositionOnPageLowerLeftX", String.valueOf((int)qrPosX));
             params.setProperty("PositionOnPageLowerLeftY", String.valueOf((int)qrPosY));
-            params.setProperty("PositionOnPageUpperRightX", String.valueOf((int)qrAncho));
-            params.setProperty("PositionOnPageUpperRightY", String.valueOf((int)qrAlto));
+            params.setProperty("PositionOnPageUpperRightX", String.valueOf((int)(qrPosX + qrAncho)));
+            params.setProperty("PositionOnPageUpperRightY", String.valueOf((int)(qrPosY + qrAlto)));
             
             // 5. Firmar digitalmente el documento con QR (la librería maneja todo)
             LOGGER.log(Level.INFO, "Iniciando firma digital del documento con QR");
