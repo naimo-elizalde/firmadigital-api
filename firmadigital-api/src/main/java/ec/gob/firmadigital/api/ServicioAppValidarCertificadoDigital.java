@@ -19,6 +19,9 @@ package ec.gob.firmadigital.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import ec.gob.firmadigital.api.security.Secured;
+import ec.gob.firmadigital.libreria.certificate.CertEcUtils;
+import ec.gob.firmadigital.libreria.certificate.to.DatosUsuario;
+import ec.gob.firmadigital.libreria.exceptions.EntidadCertificadoraNoValidaException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.POST;
@@ -129,11 +132,24 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             if (motivoNoValido != null) {
                 response.addProperty("motivoNoValido", motivoNoValido);
             }
-            
+
+            // 6. Extraer cédula/RUC y datos del titular
+            try {
+                DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(cert);
+                response.addProperty("cedula", datosUsuario.getCedula());
+                response.addProperty("nombre", datosUsuario.getNombre());
+                response.addProperty("apellido", datosUsuario.getApellido());
+                response.addProperty("institucion", datosUsuario.getInstitucion());
+                response.addProperty("cargo", datosUsuario.getCargo());
+            } catch (EntidadCertificadoraNoValidaException e) {
+                LOGGER.log(Level.WARNING, "No se pudo determinar la entidad certificadora: {0}", e.getMessage());
+                response.addProperty("cedula", (String) null);
+            }
+
             // Calcular días hasta expiración
             long diasHastaExpiracion = calcularDiasHastaExpiracion(cert.getNotAfter());
             response.addProperty("diasHastaExpiracion", diasHastaExpiracion);
-            
+
             if (diasHastaExpiracion > 0 && diasHastaExpiracion <= 30) {
                 response.addProperty("advertencia", "El certificado expirará en menos de 30 días");
             }
