@@ -27,9 +27,14 @@ import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 
 import java.io.ByteArrayInputStream;
+import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -50,6 +55,8 @@ import java.util.logging.Logger;
 public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
 
     private static final Logger LOGGER = Logger.getLogger(ServicioAppValidarCertificadoDigital.class.getName());
+    private static final String WS_SYSTEM_PROPERTY = "firmadigital-servicio.url";
+    private static final String REST_SERVICE_URL = System.getProperty(WS_SYSTEM_PROPERTY) + "/certificado";
 
     @POST
     @Secured
@@ -104,8 +111,20 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
                 motivoNoValido = "El certificado aún no es válido";
                 LOGGER.log(Level.WARNING, "Certificado aún no vigente");
             }
+
+            // 4. Verificar revocación en servicio CRL
+            RevocacionInfo revocacionInfo = consultarRevocacion(cert.getSerialNumber());
+            if (revocacionInfo.revocacionConsultada && revocacionInfo.revocado != null && revocacionInfo.revocado) {
+                valido = false;
+                if ("VIGENTE".equals(estado)) {
+                    estado = "REVOCADO";
+                    motivoNoValido = "El certificado está revocado";
+                } else if (motivoNoValido != null && !motivoNoValido.contains("revocado")) {
+                    motivoNoValido = motivoNoValido + ". Además, el certificado está revocado";
+                }
+            }
             
-            // 4. Extraer información del certificado
+            // 5. Extraer información del certificado
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
             
             // Extraer información del Subject
@@ -115,7 +134,7 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             // Parsear el CN (Common Name) del subject
             String nombreTitular = extraerCN(subject);
             
-            // 5. Construir respuesta
+            // 6. Construir respuesta
             JsonObject response = new JsonObject();
             response.addProperty("resultado", "OK");
             response.addProperty("valido", valido);
@@ -128,12 +147,25 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             response.addProperty("notAfter", sdf.format(cert.getNotAfter()));
             response.addProperty("version", cert.getVersion());
             response.addProperty("algoritmo", cert.getSigAlgName());
+            response.addProperty("revocacionConsultada", revocacionInfo.revocacionConsultada);
+
+            if (revocacionInfo.revocado != null) {
+                response.addProperty("revocado", revocacionInfo.revocado);
+            }
+
+            if (revocacionInfo.fechaRevocado != null && !revocacionInfo.fechaRevocado.isBlank()) {
+                response.addProperty("fechaRevocado", revocacionInfo.fechaRevocado);
+            }
+
+            if (revocacionInfo.detalleRevocacion != null && !revocacionInfo.detalleRevocacion.isBlank()) {
+                response.addProperty("detalleRevocacion", revocacionInfo.detalleRevocacion);
+            }
             
             if (motivoNoValido != null) {
                 response.addProperty("motivoNoValido", motivoNoValido);
             }
 
-            // 6. Extraer cédula/RUC y datos del titular
+            // 7. Extraer cédula/RUC y datos del titular
             try {
                 DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(cert);
                 response.addProperty("cedula", datosUsuario.getCedula());
@@ -164,6 +196,58 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             LOGGER.log(Level.SEVERE, "Error al validar certificado: {0}", e);
             return crearRespuestaError("Error al validar certificado: " + e.getMessage());
         }
+    }
+
+    private RevocacionInfo consultarRevocacion(BigInteger serial) {
+        RevocacionInfo info = new RevocacionInfo();
+
+        try {
+            String baseUrl = System.getProperty(WS_SYSTEM_PROPERTY);
+            if (baseUrl == null || baseUrl.isBlank()) {
+                info.detalleRevocacion = "No se pudo consultar revocación: propiedad " + WS_SYSTEM_PROPERTY + " no configurada";
+                return info;
+            }
+
+            try (Client client = ClientBuilder.newClient()) {
+                WebTarget targetRevocado = client.target(REST_SERVICE_URL + "/revocado").path("{serial}")
+                        .resolveTemplate("serial", serial);
+                Invocation.Builder builderRevocado = targetRevocado.request();
+                Invocation invocationRevocado = builderRevocado.buildGet();
+                String revocadoResponse = invocationRevocado.invoke(String.class);
+
+                info.revocacionConsultada = true;
+                info.revocado = Boolean.parseBoolean(revocadoResponse != null ? revocadoResponse.trim() : "false");
+
+                if (Boolean.TRUE.equals(info.revocado)) {
+                    WebTarget targetFecha = client.target(REST_SERVICE_URL + "/fechaRevocado").path("{serial}")
+                            .resolveTemplate("serial", serial);
+                    Invocation.Builder builderFecha = targetFecha.request();
+                    Invocation invocationFecha = builderFecha.buildGet();
+                    String fechaResponse = invocationFecha.invoke(String.class);
+
+                    if (fechaResponse != null) {
+                        String fecha = fechaResponse.trim();
+                        if (!fecha.isEmpty() && !"null".equalsIgnoreCase(fecha)) {
+                            info.fechaRevocado = fecha;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "No fue posible consultar revocación para serial {0}: {1}",
+                    new Object[]{serial, e.getMessage()});
+            info.detalleRevocacion = "No se pudo consultar revocación: " + e.getMessage();
+        }
+
+        return info;
+    }
+
+    private static class RevocacionInfo {
+
+        private boolean revocacionConsultada;
+        private Boolean revocado;
+        private String fechaRevocado;
+        private String detalleRevocacion;
     }
     
     /**
