@@ -21,16 +21,14 @@ import com.google.gson.JsonObject;
 import ec.gob.firmadigital.api.security.Secured;
 import ec.gob.firmadigital.libreria.certificate.CertEcUtils;
 import ec.gob.firmadigital.libreria.certificate.to.DatosUsuario;
+import ec.gob.firmadigital.libreria.crl.ServicioCRL;
 import ec.gob.firmadigital.libreria.exceptions.EntidadCertificadoraNoValidaException;
+import ec.gob.firmadigital.libreria.utils.CertificateUtils;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 
 import java.io.ByteArrayInputStream;
@@ -38,10 +36,14 @@ import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.CRLReason;
+import java.security.cert.X509CRL;
+import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -55,8 +57,6 @@ import java.util.logging.Logger;
 public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
 
     private static final Logger LOGGER = Logger.getLogger(ServicioAppValidarCertificadoDigital.class.getName());
-    private static final String WS_SYSTEM_PROPERTY = "firmadigital-servicio.url";
-    private static final String REST_SERVICE_URL = System.getProperty(WS_SYSTEM_PROPERTY) + "/certificado";
 
     @POST
     @Secured
@@ -113,7 +113,7 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             }
 
             // 4. Verificar revocación en servicio CRL
-            RevocacionInfo revocacionInfo = consultarRevocacion(cert.getSerialNumber());
+            RevocacionInfo revocacionInfo = consultarRevocacion(cert);
             if (revocacionInfo.revocacionConsultada && revocacionInfo.revocado != null && revocacionInfo.revocado) {
                 valido = false;
                 if ("VIGENTE".equals(estado)) {
@@ -198,44 +198,61 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
         }
     }
 
-    private RevocacionInfo consultarRevocacion(BigInteger serial) {
+    private RevocacionInfo consultarRevocacion(X509Certificate cert) {
         RevocacionInfo info = new RevocacionInfo();
+        boolean huboIntentoConsulta = false;
 
         try {
-            String baseUrl = System.getProperty(WS_SYSTEM_PROPERTY);
-            if (baseUrl == null || baseUrl.isBlank()) {
-                info.detalleRevocacion = "No se pudo consultar revocación: propiedad " + WS_SYSTEM_PROPERTY + " no configurada";
+            List<String> crlUrls = CertificateUtils.getCrlDistributionPoints(cert);
+            if (crlUrls == null || crlUrls.isEmpty()) {
+                info.detalleRevocacion = "No se encontraron URLs de CRL en el certificado";
                 return info;
             }
 
-            try (Client client = ClientBuilder.newClient()) {
-                WebTarget targetRevocado = client.target(REST_SERVICE_URL + "/revocado").path("{serial}")
-                        .resolveTemplate("serial", serial);
-                Invocation.Builder builderRevocado = targetRevocado.request();
-                Invocation invocationRevocado = builderRevocado.buildGet();
-                String revocadoResponse = invocationRevocado.invoke(String.class);
+            BigInteger serial = cert.getSerialNumber();
+            for (String crlUrl : crlUrls) {
+                if (crlUrl == null || !crlUrl.toLowerCase().contains("crl")) {
+                    continue;
+                }
 
-                info.revocacionConsultada = true;
-                info.revocado = Boolean.parseBoolean(revocadoResponse != null ? revocadoResponse.trim() : "false");
+                try {
+                    X509CRL crl = ServicioCRL.downloadCrl(crlUrl);
+                    huboIntentoConsulta = true;
 
-                if (Boolean.TRUE.equals(info.revocado)) {
-                    WebTarget targetFecha = client.target(REST_SERVICE_URL + "/fechaRevocado").path("{serial}")
-                            .resolveTemplate("serial", serial);
-                    Invocation.Builder builderFecha = targetFecha.request();
-                    Invocation invocationFecha = builderFecha.buildGet();
-                    String fechaResponse = invocationFecha.invoke(String.class);
+                    X509CRLEntry entry = crl.getRevokedCertificate(serial);
+                    if (entry != null) {
+                        info.revocacionConsultada = true;
+                        info.revocado = true;
 
-                    if (fechaResponse != null) {
-                        String fecha = fechaResponse.trim();
-                        if (!fecha.isEmpty() && !"null".equalsIgnoreCase(fecha)) {
-                            info.fechaRevocado = fecha;
+                        Date fechaRevocacion = entry.getRevocationDate();
+                        if (fechaRevocacion != null) {
+                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+                            info.fechaRevocado = sdf.format(fechaRevocacion);
                         }
+
+                        CRLReason razon = entry.getRevocationReason();
+                        if (razon != null) {
+                            info.detalleRevocacion = "Razón CRL: " + razon.name();
+                        }
+
+                        return info;
                     }
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "No fue posible consultar CRL en URL {0}: {1}",
+                            new Object[]{crlUrl, e.getMessage()});
                 }
             }
+
+            if (huboIntentoConsulta) {
+                info.revocacionConsultada = true;
+                info.revocado = false;
+                info.detalleRevocacion = "No revocado en CRL";
+            } else {
+                info.detalleRevocacion = "No se pudo consultar revocación en CRL";
+            }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "No fue posible consultar revocación para serial {0}: {1}",
-                    new Object[]{serial, e.getMessage()});
+            LOGGER.log(Level.WARNING, "No fue posible consultar revocación local para serial {0}: {1}",
+                    new Object[]{cert.getSerialNumber(), e.getMessage()});
             info.detalleRevocacion = "No se pudo consultar revocación: " + e.getMessage();
         }
 
