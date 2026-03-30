@@ -41,6 +41,7 @@ import java.security.cert.X509CRL;
 import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
@@ -200,24 +201,41 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
 
     private RevocacionInfo consultarRevocacion(X509Certificate cert) {
         RevocacionInfo info = new RevocacionInfo();
-        boolean huboIntentoConsulta = false;
 
         try {
-            List<String> crlUrls = CertificateUtils.getCrlDistributionPoints(cert);
-            if (crlUrls == null || crlUrls.isEmpty()) {
+            // Obtener URLs del certificado + fallback hardcodeado según emisor
+            List<String> crlUrls = new ArrayList<>();
+            try {
+                List<String> urlsDelCert = CertificateUtils.getCrlDistributionPoints(cert);
+                if (urlsDelCert != null) {
+                    crlUrls.addAll(urlsDelCert);
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "No se pudieron extraer URLs CRL del certificado: {0}", e.getMessage());
+            }
+
+            // Agregar URL hardcodeada de ServicioCRL como fallback según el emisor
+            String issuerDN = cert.getIssuerDN().toString().toLowerCase();
+            String fallbackUrl = resolverFallbackCrl(issuerDN);
+            if (fallbackUrl != null && !crlUrls.contains(fallbackUrl)) {
+                crlUrls.add(fallbackUrl);
+            }
+
+            if (crlUrls.isEmpty()) {
                 info.detalleRevocacion = "No se encontraron URLs de CRL en el certificado";
                 return info;
             }
 
             BigInteger serial = cert.getSerialNumber();
+            boolean intentoFallido = false;
+
             for (String crlUrl : crlUrls) {
-                if (crlUrl == null || !crlUrl.toLowerCase().contains("crl")) {
+                if (crlUrl == null || crlUrl.isBlank()) {
                     continue;
                 }
 
                 try {
                     X509CRL crl = ServicioCRL.downloadCrl(crlUrl);
-                    huboIntentoConsulta = true;
 
                     X509CRLEntry entry = crl.getRevokedCertificate(serial);
                     if (entry != null) {
@@ -231,32 +249,89 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
                         }
 
                         CRLReason razon = entry.getRevocationReason();
-                        if (razon != null) {
-                            info.detalleRevocacion = "Razón CRL: " + razon.name();
-                        }
+                        info.detalleRevocacion = razon != null ? "Razón CRL: " + razon.name() : "Revocado";
 
                         return info;
                     }
+
+                    // Descarga exitosa, no está revocado
+                    info.revocacionConsultada = true;
+                    info.revocado = false;
+                    info.detalleRevocacion = "No revocado en CRL";
+                    return info;
+
                 } catch (Exception e) {
                     LOGGER.log(Level.WARNING, "No fue posible consultar CRL en URL {0}: {1}",
                             new Object[]{crlUrl, e.getMessage()});
+                    intentoFallido = true;
                 }
             }
 
-            if (huboIntentoConsulta) {
-                info.revocacionConsultada = true;
-                info.revocado = false;
-                info.detalleRevocacion = "No revocado en CRL";
-            } else {
-                info.detalleRevocacion = "No se pudo consultar revocación en CRL";
+            if (intentoFallido) {
+                info.detalleRevocacion = "No se pudo conectar al servidor CRL";
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "No fue posible consultar revocación local para serial {0}: {1}",
+            LOGGER.log(Level.WARNING, "Error consultando revocación para serial {0}: {1}",
                     new Object[]{cert.getSerialNumber(), e.getMessage()});
             info.detalleRevocacion = "No se pudo consultar revocación: " + e.getMessage();
         }
 
         return info;
+    }
+
+    private String resolverFallbackCrl(String issuerDN) {
+        if (issuerDN.contains("lazzate")) {
+            if (issuerDN.contains("emisor ca2") || issuerDN.contains("ca2")) {
+                return ServicioCRL.LAZZATECA2_CRL;
+            }
+            if (issuerDN.contains("emisor ca1") || issuerDN.contains("ca1")) {
+                return ServicioCRL.LAZZATECA1_CRL;
+            }
+            return ServicioCRL.LAZZATE_CRL;
+        }
+        if (issuerDN.contains("security data")) {
+            return ServicioCRL.SD_CRL1;
+        }
+        if (issuerDN.contains("bce") || issuerDN.contains("banco central")) {
+            return ServicioCRL.BCE_CRL;
+        }
+        if (issuerDN.contains("registro civil") || issuerDN.contains("digercic")) {
+            return ServicioCRL.DIGERCIC_CRL;
+        }
+        if (issuerDN.contains("consejo de la judicatura") || issuerDN.contains("icert")) {
+            return ServicioCRL.CJ_CRL;
+        }
+        if (issuerDN.contains("anf")) {
+            return ServicioCRL.ANFAC_CRL1;
+        }
+        if (issuerDN.contains("uanataca")) {
+            return ServicioCRL.UANATACA_CRL1;
+        }
+        if (issuerDN.contains("datil")) {
+            return ServicioCRL.DATIL_CRL;
+        }
+        if (issuerDN.contains("argosdata")) {
+            return ServicioCRL.ARGOSDATA_CRL;
+        }
+        if (issuerDN.contains("we-go") || issuerDN.contains("we go")) {
+            return ServicioCRL.LAZZATE_WE_GO_CRL;
+        }
+        if (issuerDN.contains("corpnewbest") || issuerDN.contains("newbest")) {
+            return ServicioCRL.CORPNEWBEST_CRL1;
+        }
+        if (issuerDN.contains("firmasegura")) {
+            return ServicioCRL.FIRMASEGURA_CRL;
+        }
+        if (issuerDN.contains("letmi")) {
+            return ServicioCRL.LETMI2_CRL;
+        }
+        if (issuerDN.contains("appfirmas") || issuerDN.contains("app firmas")) {
+            return ServicioCRL.APP_FIRMAS_CRL;
+        }
+        if (issuerDN.contains("alpha") || issuerDN.contains("globalsign")) {
+            return ServicioCRL.ALPHATECHNOLOGIES_CA2_CRL;
+        }
+        return null;
     }
 
     private static class RevocacionInfo {
