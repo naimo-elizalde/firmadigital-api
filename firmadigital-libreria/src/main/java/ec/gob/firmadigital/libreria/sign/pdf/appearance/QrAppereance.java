@@ -85,10 +85,10 @@ public class QrAppereance implements CustomAppearance {
 
         // QR - Generar contenido del código QR
         String text = "FIRMADO POR: " + nombreFirmante.trim() + "\n";
-        text = text + "RAZON: " + "Firmado digitalmente con Nexus Soluciones" + "\n";
+        text = text + "RAZON: " + "Firmado digitalmente con Corporacion Elizalde" + "\n";
         text = text + "LOCALIZACION: " + "ECUADOR" + "\n";
         text = text + "FECHA: " + signTime + "\n";
-        text = text + "VALIDAR CON: " + "https://www.solucionesnexus.com" + "\n";
+        text = text + "VALIDAR CON: " + "https://www.corporacionelizalde.com" + "\n";
         text = text + infoQR;
 
         try {
@@ -137,7 +137,7 @@ public class QrAppereance implements CustomAppearance {
                 .setFontSize(6.25f);
         textDiv.add(paragraph);
 
-        Text info = new Text("\nValidar únicamente con Nexus Soluciones\n");
+        Text info = new Text("\nValidar únicamente con Corporacion Elizalde\n");
         paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
                 .setFontSize(3.25f);
         textDiv.add(paragraph);

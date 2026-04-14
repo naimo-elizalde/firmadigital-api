@@ -79,7 +79,7 @@ public class Information1Appearance implements CustomAppearance {
                 .setFontSize(3.75f);
         textDiv.add(paragraph);
 
-        contenido = new Text("Validar únicamente con Nexus Soluciones");
+        contenido = new Text("Validar únicamente con Corporacion Elizalde");
         paragraph = new Paragraph().add(contenido).setFont(fontHelvetica).setMargin(0).
                 setMultipliedLeading(0.9f)
                 .setFontSize(2.75f);
