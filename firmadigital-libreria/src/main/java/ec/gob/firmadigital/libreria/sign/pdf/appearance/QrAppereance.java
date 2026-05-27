@@ -127,9 +127,9 @@ public class QrAppereance implements CustomAppearance {
         textDiv.setHeight(signatureRect.getHeight());
         textDiv.setWidth(signatureRect.getWidth());
         textDiv.setVerticalAlignment(VerticalAlignment.MIDDLE);
-        textDiv.setHorizontalAlignment(HorizontalAlignment.LEFT);
+        textDiv.setHorizontalAlignment(HorizontalAlignment.CENTER);
 
-        Text info = new Text("Validar únicamente con Elizalde&Asociados.\nhttps://corporacionelizalde.com/\n");
+        Text info = new Text("Validar únicamente con Elizalde&Asociados.\n");
         Paragraph paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
                 .setFontSize(3.25f);
         textDiv.add(paragraph);
