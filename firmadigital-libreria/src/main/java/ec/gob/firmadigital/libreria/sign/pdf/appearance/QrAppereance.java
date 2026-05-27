@@ -88,6 +88,7 @@ public class QrAppereance implements CustomAppearance {
         text = text + "RAZON: " + (reason != null && !reason.isEmpty() ? reason : "Firma digital") + "\n";
         text = text + "LOCALIZACION: " + (location != null && !location.isEmpty() ? location : "Ecuador") + "\n";
         text = text + "FECHA: " + signTime + "\n";
+        text = text + "VALIDAR CON: https://corporacionelizalde.com/\n";
         if (infoQR != null && !infoQR.isEmpty()) {
             text = text + infoQR;
         }
