@@ -142,7 +142,7 @@ public class Json {
             jsonObjectCertificado.addProperty("razon", certificado.getDocReason());
             jsonObjectCertificado.addProperty("localizacion", certificado.getDocLocation());
             if (certificado.getDocTimeStamp() != null) {
-                jsonObjectCertificado.addProperty("selladoTiempoFecha", formatDate(certificado.getDocTimeStamp().getTime()));
+                jsonObjectCertificado.addProperty("selladoTiempoFecha", formatDate(certificado.getDocTimeStamp()));
                 jsonObjectCertificado.addProperty("selladoTiempoEmitidoPor", certificado.getDocTimeStampIssuedBy());
                 jsonObjectCertificado.addProperty("selladoTiempoValido", certificado.getDocValidTimeStamp());
             }
