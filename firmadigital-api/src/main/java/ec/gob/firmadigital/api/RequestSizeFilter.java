@@ -43,32 +43,21 @@ public class RequestSizeFilter implements ContainerRequestFilter {
      *
      * Nombre de las propiedades que contiene el servicio web (valor en KB)
      */
-    private static String REQUEST_SIZE_SYSTEM_PROPERTY = null;
-
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
-        switch (requestContext.getUriInfo().getMatchedURIs().get(0)) {
-            case "appverificardocumento" -> {
-                REQUEST_SIZE_SYSTEM_PROPERTY = "firmadigital-api-mobile.appverificardocumento.request.size";
-            }
-            case "appvalidarcertificadodigital" -> {
-                REQUEST_SIZE_SYSTEM_PROPERTY = "firmadigital-api-mobile.appvalidarcertificadodigital.request.size";
-            }
-            case "appfirmardocumento" -> {
-                REQUEST_SIZE_SYSTEM_PROPERTY = "firmadigital-api-mobile.appfirmardocumento.request.size";
-            }
-            case "appfirmardocumentotransversal" -> {
-                REQUEST_SIZE_SYSTEM_PROPERTY = "firmadigital-api-mobile.appfirmardocumentotransversal.request.size";
-            }
-            default -> {
-                REQUEST_SIZE_SYSTEM_PROPERTY = "firmadigital-api.request.size";
-            }
-        }
-        int maxRequestSize = (System.getProperty(REQUEST_SIZE_SYSTEM_PROPERTY)) != null
-                ? Integer.parseInt(System.getProperty(REQUEST_SIZE_SYSTEM_PROPERTY)) : 512000;//KB
+        String propertyName = switch (requestContext.getUriInfo().getMatchedURIs().get(0)) {
+            case "appverificardocumento" -> "firmadigital-api-mobile.appverificardocumento.request.size";
+            case "appvalidarcertificadodigital" -> "firmadigital-api-mobile.appvalidarcertificadodigital.request.size";
+            case "appfirmardocumento" -> "firmadigital-api-mobile.appfirmardocumento.request.size";
+            case "appfirmardocumentotransversal" -> "firmadigital-api-mobile.appfirmardocumentotransversal.request.size";
+            case "appfirmardocumentoconqr" -> "firmadigital-api-mobile.appfirmardocumentoconqr.request.size";
+            default -> "firmadigital-api.request.size";
+        };
+        int maxRequestSize = (System.getProperty(propertyName)) != null
+                ? Integer.parseInt(System.getProperty(propertyName)) : 512000;//KB
         long contentLength = requestContext.getLength();
         if (requestContext.getMethod().equals("POST")
-                && contentLength > (maxRequestSize * 1024)) {//KB to BYTE
+                && contentLength > (maxRequestSize * 1024L)) {//KB to BYTE
             requestContext.abortWith(Response.status(Response.Status.REQUEST_ENTITY_TOO_LARGE)
                     .entity("La solicitud no puede exceder los " + maxRequestSize / 1024 + " MB")//KB to MB
                     .build());

@@ -26,11 +26,9 @@ import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -108,13 +106,14 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
                 return null;
             }
             
-            // Leer el cuerpo de la petición
+            // Leer el cuerpo de la petición (solo primeros 4KB para buscar el token)
             InputStream originalStream = requestContext.getEntityStream();
-            String body = readInputStream(originalStream);
-            
+            byte[] bodyBytes = originalStream.readAllBytes();
+            String body = new String(bodyBytes, 0, Math.min(bodyBytes.length, 4096), StandardCharsets.UTF_8);
+
             // Restaurar el stream para que el endpoint pueda leerlo
-            requestContext.setEntityStream(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
-            
+            requestContext.setEntityStream(new ByteArrayInputStream(bodyBytes));
+
             // Parsear el cuerpo para extraer el parámetro jwt
             if (body.contains("jwt=")) {
                 String[] params = body.split("&");
@@ -134,20 +133,6 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
         }
         
         return null;
-    }
-    
-    /**
-     * Lee un InputStream y lo convierte a String
-     */
-    private String readInputStream(InputStream stream) throws IOException {
-        StringBuilder builder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line);
-            }
-        }
-        return builder.toString();
     }
     
     /**

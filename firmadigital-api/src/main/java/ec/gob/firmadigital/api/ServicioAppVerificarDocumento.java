@@ -19,9 +19,15 @@ package ec.gob.firmadigital.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.itextpdf.kernel.pdf.PdfReader;
 import ec.gob.firmadigital.api.security.Secured;
+import ec.gob.firmadigital.api.utils.Base64Utils;
+import ec.gob.firmadigital.libreria.certificate.to.Certificado;
+import ec.gob.firmadigital.libreria.certificate.to.DatosUsuario;
+import ec.gob.firmadigital.libreria.certificate.to.Documento;
 import ec.gob.firmadigital.libreria.sign.SignInfo;
 import ec.gob.firmadigital.libreria.sign.pdf.PadesSigner;
+import ec.gob.firmadigital.libreria.utils.Utils;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.POST;
@@ -29,16 +35,16 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
-import java.security.cert.X509Certificate;
+import java.io.ByteArrayInputStream;
 import java.text.SimpleDateFormat;
-import java.util.Base64;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * REST Web Service para verificar documentos firmados.
- * Versión standalone usando directamente la librería de firma digital.
  *
  * @author Christian Espinosa, Misael Fernández
  */
@@ -46,6 +52,7 @@ import java.util.logging.Logger;
 public class ServicioAppVerificarDocumento extends RequestSizeFilter {
 
     private static final Logger LOGGER = Logger.getLogger(ServicioAppVerificarDocumento.class.getName());
+    private static final SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
     @POST
     @Secured
@@ -55,95 +62,74 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
             @FormParam("documento") String documentoBase64
     ) {
         LOGGER.log(Level.INFO, "Iniciando verificación de documento firmado");
-        
+
         try {
-            // Validar parámetros requeridos
             if (documentoBase64 == null || documentoBase64.isEmpty()) {
                 return crearRespuestaError("El documento es requerido");
             }
-            
-            // 1. Decodificar documento
-            LOGGER.log(Level.INFO, "Decodificando documento");
-            byte[] docBytes = decodificarBase64(documentoBase64);
-            
-            // 2. Verificar firmas del PDF
-            LOGGER.log(Level.INFO, "Extrayendo firmas del documento PDF");
+
+            byte[] docBytes = Base64Utils.decodificar(documentoBase64);
+
             PadesSigner padesSigner = new PadesSigner();
-            List<SignInfo> firmas = padesSigner.getSigners(docBytes);
-            
-            if (firmas == null || firmas.isEmpty()) {
-                LOGGER.log(Level.WARNING, "No se encontraron firmas en el documento");
-                JsonObject response = new JsonObject();
-                response.addProperty("resultado", "OK");
-                response.addProperty("firmaValida", false);
-                response.addProperty("numeroFirmas", 0);
-                response.addProperty("mensaje", "El documento no contiene firmas digitales");
-                return new Gson().toJson(response);
-            }
-            
-            // 3. Construir respuesta con información de cada firma
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-            
+            List<SignInfo> signInfos = padesSigner.getSigners(docBytes);
+
+            PdfReader pdfReader = new PdfReader(new ByteArrayInputStream(docBytes));
+            Documento documento = Utils.pdfToDocumento(pdfReader, signInfos);
+
+            List<Certificado> certificados = documento.getCertificados();
+
             JsonObject response = new JsonObject();
             response.addProperty("resultado", "OK");
-            response.addProperty("firmaValida", true);
-            response.addProperty("numeroFirmas", firmas.size());
-            
+            response.addProperty("firmasValidas", documento.getSignValidate());
+            response.addProperty("documentoIntegro", documento.getDocValidate());
+            response.addProperty("numeroFirmas", certificados != null ? certificados.size() : 0);
+
             JsonArray firmasArray = new JsonArray();
-            int firmaIndex = 1;
-            
-            for (SignInfo signInfo : firmas) {
-                try {
-                    // getCerts() retorna un array, el primer elemento es el certificado del firmante
-                    X509Certificate[] certs = signInfo.getCerts();
-                    X509Certificate cert = certs[0];
-                    
+            if (certificados != null) {
+                for (Certificado cert : certificados) {
                     JsonObject firmaObj = new JsonObject();
-                    firmaObj.addProperty("numeroFirma", firmaIndex++);
-                    firmaObj.addProperty("firmante", cert.getSubjectDN().toString());
-                    firmaObj.addProperty("nombreFirmante", extraerCN(cert.getSubjectDN().toString()));
-                    firmaObj.addProperty("fechaFirma", sdf.format(signInfo.getSigningTime()));
-                    firmaObj.addProperty("emisor", cert.getIssuerDN().toString());
-                    firmaObj.addProperty("serialNumber", cert.getSerialNumber().toString());
-                    
-                    // Verificar validez del certificado al momento de la firma
-                    boolean certValido = true;
-                    String estadoCertificado = "VALIDO";
-                    try {
-                        cert.checkValidity(signInfo.getSigningTime());
-                    } catch (Exception e) {
-                        certValido = false;
-                        estadoCertificado = "NO_VALIDO";
-                        LOGGER.log(Level.WARNING, "Certificado no era válido al momento de la firma");
+                    firmaObj.addProperty("nombreCompleto", cert.getIssuedTo());
+                    firmaObj.addProperty("entidadCertificadora", cert.getIssuedBy());
+                    firmaObj.addProperty("fechaEmision", formatCalendar(cert.getValidFrom()));
+                    firmaObj.addProperty("fechaExpiracion", formatCalendar(cert.getValidTo()));
+                    firmaObj.addProperty("fechaFirmado", formatCalendar(cert.getSignGenerated()));
+                    firmaObj.addProperty("revocado", cert.getRevocated() != null);
+                    firmaObj.addProperty("fechaRevocacion", cert.getRevocated() != null ? formatCalendar(cert.getRevocated()) : (String) null);
+                    firmaObj.addProperty("certificadoVigente", cert.getCertificateValidated());
+                    firmaObj.addProperty("integridadFirma", cert.getSignVerify());
+                    firmaObj.addProperty("razon", cert.getDocReason());
+                    firmaObj.addProperty("localizacion", cert.getDocLocation());
+                    firmaObj.addProperty("usosLlave", cert.getKeyUsages());
+
+                    // Sellado de tiempo
+                    JsonObject tsObj = new JsonObject();
+                    tsObj.addProperty("fecha", cert.getDocTimeStamp() != null ? formatDate(cert.getDocTimeStamp()) : (String) null);
+                    tsObj.addProperty("emitidoPor", cert.getDocTimeStampIssuedBy());
+                    tsObj.addProperty("valido", cert.getDocValidTimeStamp() != null && cert.getDocValidTimeStamp());
+                    tsObj.addProperty("autoridad", cert.getCnTimeStamp());
+                    firmaObj.add("selladoTiempo", tsObj);
+
+                    // Datos del usuario
+                    DatosUsuario du = cert.getDatosUsuario();
+                    if (du != null) {
+                        JsonObject duObj = new JsonObject();
+                        duObj.addProperty("cedula", du.getCedula());
+                        duObj.addProperty("nombreCompleto", (du.getNombre() != null ? du.getNombre() : "") + " " + (du.getApellido() != null ? du.getApellido() : ""));
+                        duObj.addProperty("tipoCertificado", du.getTipoCertificado());
+                        duObj.addProperty("certificadoDigitalValido", du.isCertificadoDigitalValido());
+                        firmaObj.add("datosUsuario", duObj);
                     }
-                    
-                    firmaObj.addProperty("certificadoValido", certValido);
-                    firmaObj.addProperty("estadoCertificado", estadoCertificado);
-                    
-                    // Información adicional del certificado
-                    firmaObj.addProperty("validezDesde", sdf.format(cert.getNotBefore()));
-                    firmaObj.addProperty("validezHasta", sdf.format(cert.getNotAfter()));
-                    
-                    firmasArray.add(firmaObj);
-                    
-                } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "Error al procesar firma {0}: {1}", 
-                              new Object[]{firmaIndex, e.getMessage()});
-                    
-                    JsonObject firmaObj = new JsonObject();
-                    firmaObj.addProperty("numeroFirma", firmaIndex++);
-                    firmaObj.addProperty("error", "Error al procesar firma: " + e.getMessage());
+
                     firmasArray.add(firmaObj);
                 }
             }
-            
             response.add("firmas", firmasArray);
-            
-            LOGGER.log(Level.INFO, "Verificación completada. Se encontraron {0} firma(s)", firmas.size());
+
+            LOGGER.log(Level.INFO, "Verificación completada. Firmas: {0}", certificados != null ? certificados.size() : 0);
             return new Gson().toJson(response);
-            
+
         } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE, "Error de formato en los datos: {0}", e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error de formato: {0}", e.getMessage());
             return crearRespuestaError("Error de formato: El documento no está correctamente codificado en Base64");
         } catch (ec.gob.firmadigital.libreria.exceptions.InvalidFormatException e) {
             LOGGER.log(Level.SEVERE, "Formato de documento inválido: {0}", e.getMessage());
@@ -153,56 +139,22 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
             return crearRespuestaError("Error al verificar documento: " + e.getMessage());
         }
     }
-    
-    /**
-     * Extrae el Common Name (CN) del Distinguished Name
-     */
-    private String extraerCN(String dn) {
-        if (dn == null) return "";
-        
-        String[] parts = dn.split(",");
-        for (String part : parts) {
-            part = part.trim();
-            if (part.toUpperCase().startsWith("CN=")) {
-                return part.substring(3);
-            }
-        }
-        return "";
+
+    private String formatCalendar(Calendar cal) {
+        if (cal == null) return null;
+        return SDF.format(cal.getTime());
     }
-    
+
+    private String formatDate(Date date) {
+        if (date == null) return null;
+        return SDF.format(date);
+    }
+
     private String crearRespuestaError(String mensaje) {
         JsonObject error = new JsonObject();
         error.addProperty("resultado", "ERROR");
         error.addProperty("mensaje", mensaje);
         error.addProperty("firmaValida", false);
         return new Gson().toJson(error);
-    }
-    
-    /**
-     * Decodifica una cadena Base64 limpiando caracteres no válidos.
-     * Elimina espacios, saltos de línea y otros caracteres no Base64.
-     */
-    private byte[] decodificarBase64(String base64String) {
-        if (base64String == null || base64String.isEmpty()) {
-            throw new IllegalArgumentException("Cadena Base64 vacía");
-        }
-        
-        // Limpiar la cadena: eliminar espacios, saltos de línea, retornos de carro, tabulaciones
-        String cleaned = base64String.trim().replaceAll("\\s+", "");
-        
-        try {
-            // Intentar con decoder estándar primero
-            return Base64.getDecoder().decode(cleaned);
-        } catch (IllegalArgumentException e1) {
-            LOGGER.log(Level.WARNING, "Fallo decodificación estándar, intentando con MIME decoder: {0}", e1.getMessage());
-            
-            try {
-                // Intentar con MIME decoder que es más permisivo
-                return Base64.getMimeDecoder().decode(cleaned);
-            } catch (IllegalArgumentException e2) {
-                LOGGER.log(Level.SEVERE, "Error al decodificar Base64 con ambos decoders: {0}", e2.getMessage());
-                throw new IllegalArgumentException("El contenido Base64 no es válido. Verifique que el contenido esté correctamente codificado.");
-            }
-        }
     }
 }

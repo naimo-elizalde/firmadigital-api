@@ -32,25 +32,39 @@ public class PropertiesUtils {
     private static final Logger LOGGER = Logger.getLogger(PropertiesUtils.class.getName());
     private static final String MESSAGES = "messages.rubrica.properties";
     private static final String CONFIG = "config.rubrica.properties";
-    private static Properties messages;
-    private static Properties config;
+    private static volatile Properties messages;
+    private static volatile Properties config;
 
     public static Properties getMessages() {
-        messages = new Properties();
-        try {
-            messages.load(PropertiesUtils.class.getClassLoader().getResourceAsStream(MESSAGES));
-        } catch (IOException ex) {
-            LOGGER.log(Level.SEVERE, null, ex);
+        if (messages == null) {
+            synchronized (PropertiesUtils.class) {
+                if (messages == null) {
+                    Properties p = new Properties();
+                    try (var is = PropertiesUtils.class.getClassLoader().getResourceAsStream(MESSAGES)) {
+                        p.load(is);
+                    } catch (IOException ex) {
+                        LOGGER.log(Level.SEVERE, null, ex);
+                    }
+                    messages = p;
+                }
+            }
         }
         return messages;
     }
 
     public static Properties getConfig() {
-        config = new Properties();
-        try {
-            config.load(PropertiesUtils.class.getClassLoader().getResourceAsStream(CONFIG));
-        } catch (IOException ex) {
-            LOGGER.log(Level.SEVERE, null, ex);
+        if (config == null) {
+            synchronized (PropertiesUtils.class) {
+                if (config == null) {
+                    Properties p = new Properties();
+                    try (var is = PropertiesUtils.class.getClassLoader().getResourceAsStream(CONFIG)) {
+                        p.load(is);
+                    } catch (IOException ex) {
+                        LOGGER.log(Level.SEVERE, null, ex);
+                    }
+                    config = p;
+                }
+            }
         }
         return config;
     }

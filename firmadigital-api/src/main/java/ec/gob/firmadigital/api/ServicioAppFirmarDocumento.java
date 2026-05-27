@@ -19,6 +19,9 @@ package ec.gob.firmadigital.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import ec.gob.firmadigital.api.security.Secured;
+import ec.gob.firmadigital.api.utils.Base64Utils;
+import ec.gob.firmadigital.libreria.certificate.CertEcUtils;
+import ec.gob.firmadigital.libreria.certificate.to.DatosUsuario;
 import ec.gob.firmadigital.libreria.sign.DigestAlgorithm;
 import ec.gob.firmadigital.libreria.sign.PrivateKeySigner;
 import ec.gob.firmadigital.libreria.sign.pdf.PadesBasic;
@@ -33,6 +36,7 @@ import java.io.ByteArrayInputStream;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -75,10 +79,10 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
             
             // 1. Decodificar certificado PKCS#12
             LOGGER.log(Level.INFO, "Decodificando certificado PKCS#12");
-            byte[] certBytes = decodificarBase64(pkcs12Base64);
+            byte[] certBytes = Base64Utils.decodificar(pkcs12Base64);
             KeyStore keyStore = KeyStore.getInstance("PKCS12");
             keyStore.load(new ByteArrayInputStream(certBytes), password.toCharArray());
-            
+
             // 2. Obtener llave privada y cadena de certificados
             LOGGER.log(Level.INFO, "Obteniendo llave privada y certificados");
             String alias = keyStore.aliases().nextElement();
@@ -92,23 +96,40 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
                 return crearRespuestaError("No se pudo obtener la cadena de certificados");
             }
             
-            // 3. Decodificar documento
+            // 3. Extraer cédula del certificado X509 para TSA
+            String identificacion = null;
+            try {
+                DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios((X509Certificate) certChain[0]);
+                if (datosUsuario != null && datosUsuario.getCedula() != null) {
+                    identificacion = datosUsuario.getCedula();
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "No se pudo extraer cédula del certificado: {0}", e.getMessage());
+            }
+
+            // 4. Decodificar documento
             LOGGER.log(Level.INFO, "Decodificando documento PDF");
-            byte[] docBytes = decodificarBase64(documentoBase64);
-            
-            // 4. Parsear metadatos (si existen)
+            byte[] docBytes = Base64Utils.decodificar(documentoBase64);
+
+            // 5. Parsear metadatos (si existen)
             Properties params = new Properties();
+            if (identificacion != null) {
+                params.setProperty("identificacion", identificacion);
+            }
             if (jsonMetadata != null && !jsonMetadata.isEmpty()) {
                 try {
                     JsonObject metadata = new Gson().fromJson(jsonMetadata, JsonObject.class);
                     if (metadata.has("razon")) {
-                        params.setProperty("razon", metadata.get("razon").getAsString());
+                        params.setProperty("signingReason", metadata.get("razon").getAsString());
                     }
                     if (metadata.has("localizacion")) {
-                        params.setProperty("localizacion", metadata.get("localizacion").getAsString());
+                        params.setProperty("signingLocation", metadata.get("localizacion").getAsString());
                     }
                     if (metadata.has("cargo")) {
                         params.setProperty("cargo", metadata.get("cargo").getAsString());
+                    }
+                    if (metadata.has("identificacion") && identificacion == null) {
+                        params.setProperty("identificacion", metadata.get("identificacion").getAsString());
                     }
                     LOGGER.log(Level.INFO, "Metadatos de firma: {0}", metadata);
                 } catch (Exception e) {
@@ -116,7 +137,7 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
                 }
             }
             
-            // 5. Crear firmador y firmar documento
+            // 6. Crear firmador y firmar documento
             LOGGER.log(Level.INFO, "Iniciando firma del documento");
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
             PadesBasic padesSigner = new PadesBasic(signer);
@@ -125,7 +146,7 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
             ByteArrayInputStream inputStream = new ByteArrayInputStream(docBytes);
             byte[] documentoFirmado = padesSigner.sign(inputStream, signer, certChain, params);
             
-            // 6. Codificar y retornar
+            // 7. Codificar y retornar
             String documentoFirmadoBase64 = Base64.getEncoder().encodeToString(documentoFirmado);
             LOGGER.log(Level.INFO, "Documento firmado exitosamente");
             
@@ -142,12 +163,20 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
         } catch (java.security.UnrecoverableKeyException e) {
             LOGGER.log(Level.SEVERE, "Contraseña incorrecta: {0}", e.getMessage());
             return crearRespuestaError("Contraseña del certificado incorrecta");
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("TSA") || msg.contains("401") || msg.contains("409")) {
+                LOGGER.log(Level.SEVERE, "Error TSA: {0}", msg);
+                return crearRespuestaError("Error del servidor TSA: " + msg);
+            }
+            LOGGER.log(Level.SEVERE, "Error al firmar documento: {0}", e);
+            return crearRespuestaError("Error al firmar documento: " + msg);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error al firmar documento: {0}", e);
             return crearRespuestaError("Error al firmar documento: " + e.getMessage());
         }
     }
-    
+
     private String crearRespuestaError(String mensaje) {
         JsonObject error = new JsonObject();
         error.addProperty("resultado", "ERROR");
@@ -155,38 +184,4 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
         return new Gson().toJson(error);
     }
     
-    /**
-     * Decodifica una cadena Base64 limpiando caracteres no válidos.
-     * Elimina espacios, saltos de línea y otros caracteres no Base64.
-     */
-    private byte[] decodificarBase64(String base64String) {
-        if (base64String == null || base64String.isEmpty()) {
-            throw new IllegalArgumentException("Cadena Base64 vacía");
-        }
-        
-        // Log de la longitud original para debugging
-        LOGGER.log(Level.INFO, "Longitud Base64 original: {0}", base64String.length());
-        
-        // Limpiar la cadena: eliminar espacios, saltos de línea, retornos de carro, tabulaciones
-        String cleaned = base64String.trim().replaceAll("\\s+", "");
-        
-        LOGGER.log(Level.INFO, "Longitud Base64 después de limpiar: {0}", cleaned.length());
-        LOGGER.log(Level.FINE, "Primeros 50 caracteres: {0}", cleaned.substring(0, Math.min(50, cleaned.length())));
-        LOGGER.log(Level.FINE, "Últimos 50 caracteres: {0}", cleaned.length() > 50 ? cleaned.substring(cleaned.length() - 50) : cleaned);
-        
-        try {
-            // Intentar con decoder estándar primero
-            return Base64.getDecoder().decode(cleaned);
-        } catch (IllegalArgumentException e1) {
-            LOGGER.log(Level.WARNING, "Fallo decodificación estándar, intentando con MIME decoder: {0}", e1.getMessage());
-            
-            try {
-                // Intentar con MIME decoder que es más permisivo
-                return Base64.getMimeDecoder().decode(cleaned);
-            } catch (IllegalArgumentException e2) {
-                LOGGER.log(Level.SEVERE, "Error al decodificar Base64 con ambos decoders: {0}", e2.getMessage());
-                throw new IllegalArgumentException("El contenido Base64 no es válido. Verifique que el contenido esté correctamente codificado.");
-            }
-        }
-    }
 }

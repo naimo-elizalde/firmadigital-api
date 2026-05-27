@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 
+ * Copyright (C) 2021
  * Authors: Ricardo Arguello
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,10 +26,13 @@ import java.util.logging.Logger;
 
 import com.itextpdf.signatures.BouncyCastleDigest;
 import com.itextpdf.signatures.IExternalSignature;
+import com.itextpdf.signatures.ITSAClient;
 import com.itextpdf.signatures.PdfSigner.CryptoStandard;
+import com.itextpdf.signatures.TSAClientBouncyCastle;
 
 import ec.gob.firmadigital.libreria.sign.RubricaSigner;
 import ec.gob.firmadigital.libreria.sign.pdf.itext.SignerAdapter;
+import ec.gob.firmadigital.libreria.utils.PropertiesUtils;
 import java.util.logging.Level;
 
 /**
@@ -49,12 +52,35 @@ public class PadesBasic extends BaseSigner {
     protected byte[] signInternal(ByteArrayOutputStream os, com.itextpdf.signatures.PdfSigner pdfSigner, RubricaSigner signer,
             Certificate[] certChain, Properties params) throws IOException {
         try {
-            pdfSigner.signDetached(new BouncyCastleDigest(), externalSignature, certChain, null, null, null, 0,
-                    CryptoStandard.CMS);
+            ITSAClient tsaClient = createTsaClient(params);
+            int estimatedSize = tsaClient != null ? 16384 : 0;
+            pdfSigner.signDetached(new BouncyCastleDigest(), externalSignature, certChain, null, null, tsaClient,
+                    estimatedSize, CryptoStandard.CMS);
             return os.toByteArray();
         } catch (GeneralSecurityException e) {
             LOGGER.log(Level.SEVERE, "Error al firmar: {0}", e.getMessage());
             throw new RuntimeException(e);
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("401")) {
+                throw new RuntimeException("Credenciales TSA incorrectas (HTTP 401): " + msg, e);
+            }
+            if (msg.contains("409")) {
+                throw new RuntimeException("Hash duplicado en servidor TSA (HTTP 409): " + msg, e);
+            }
+            throw e;
         }
+    }
+
+    private ITSAClient createTsaClient(Properties params) {
+        String cedula = params != null ? params.getProperty("identificacion") : null;
+        if (cedula == null || cedula.isBlank()) {
+            return null;
+        }
+        String tsaUrl = PropertiesUtils.getConfig().getProperty("tsa_url");
+        if (tsaUrl == null || tsaUrl.isBlank()) {
+            return null;
+        }
+        return new TSAClientBouncyCastle(tsaUrl, cedula, cedula);
     }
 }

@@ -19,6 +19,9 @@ package ec.gob.firmadigital.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import ec.gob.firmadigital.api.security.Secured;
+import ec.gob.firmadigital.api.utils.Base64Utils;
+import ec.gob.firmadigital.libreria.certificate.CertEcUtils;
+import ec.gob.firmadigital.libreria.certificate.to.DatosUsuario;
 import ec.gob.firmadigital.libreria.sign.DigestAlgorithm;
 import ec.gob.firmadigital.libreria.sign.PrivateKeySigner;
 import ec.gob.firmadigital.libreria.sign.pdf.PadesBasic;
@@ -99,32 +102,43 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             
             // 1. Decodificar certificado PKCS#12
             LOGGER.log(Level.INFO, "Decodificando certificado PKCS#12");
-            byte[] certBytes = decodificarBase64(pkcs12Base64);
+            byte[] certBytes = Base64Utils.decodificar(pkcs12Base64);
             KeyStore keyStore = KeyStore.getInstance("PKCS12");
             keyStore.load(new ByteArrayInputStream(certBytes), password.toCharArray());
-            
+
             // 2. Obtener llave privada y cadena de certificados
             LOGGER.log(Level.INFO, "Obteniendo llave privada y certificados");
             String alias = keyStore.aliases().nextElement();
             PrivateKey privateKey = (PrivateKey) keyStore.getKey(alias, password.toCharArray());
             Certificate[] certChain = keyStore.getCertificateChain(alias);
-            
+
             if (privateKey == null) {
                 return crearRespuestaError("No se pudo obtener la llave privada del certificado");
             }
             if (certChain == null || certChain.length == 0) {
                 return crearRespuestaError("No se pudo obtener la cadena de certificados");
             }
-            
-            // Extraer nombre del firmante del certificado
-            String nombreFirmante = extraerNombreFirmante(certChain[0]);
-            
-            // 3. Decodificar documento
+
+            // 3. Extraer cédula del certificado X509 para TSA
+            String identificacion = null;
+            try {
+                DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios((X509Certificate) certChain[0]);
+                if (datosUsuario != null && datosUsuario.getCedula() != null) {
+                    identificacion = datosUsuario.getCedula();
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "No se pudo extraer cédula del certificado: {0}", e.getMessage());
+            }
+
+            // 4. Decodificar documento
             LOGGER.log(Level.INFO, "Decodificando documento PDF");
-            byte[] docBytes = decodificarBase64(documentoBase64);
-            
-            // 4. Parsear metadatos y configurar parámetros de firma con QR
+            byte[] docBytes = Base64Utils.decodificar(documentoBase64);
+
+            // 5. Parsear metadatos y configurar parámetros de firma con QR
             Properties params = new Properties();
+            if (identificacion != null) {
+                params.setProperty("identificacion", identificacion);
+            }
             
             // Configurar firma con QR
             params.setProperty("typeSignature", "QR");
@@ -141,13 +155,16 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
                     
                     // Metadatos de firma
                     if (metadata.has("razon")) {
-                        params.setProperty("razon", metadata.get("razon").getAsString());
+                        params.setProperty("signingReason", metadata.get("razon").getAsString());
                     }
                     if (metadata.has("localizacion")) {
-                        params.setProperty("localizacion", metadata.get("localizacion").getAsString());
+                        params.setProperty("signingLocation", metadata.get("localizacion").getAsString());
                     }
                     if (metadata.has("cargo")) {
                         params.setProperty("cargo", metadata.get("cargo").getAsString());
+                    }
+                    if (metadata.has("identificacion") && identificacion == null) {
+                        params.setProperty("identificacion", metadata.get("identificacion").getAsString());
                     }
                     
                     // Metadatos del QR
@@ -184,12 +201,12 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             }
             
             // Configurar posición del QR usando los nombres correctos de la librería
-            params.setProperty("PositionOnPageLowerLeftX", String.valueOf((int)qrPosX));
-            params.setProperty("PositionOnPageLowerLeftY", String.valueOf((int)qrPosY));
-            params.setProperty("PositionOnPageUpperRightX", String.valueOf((int)qrAncho));
-            params.setProperty("PositionOnPageUpperRightY", String.valueOf((int)qrAlto));
-            
-            // 5. Firmar digitalmente el documento con QR (la librería maneja todo)
+            params.setProperty("PositionOnPageLowerLeftX", String.valueOf((int) qrPosX));
+            params.setProperty("PositionOnPageLowerLeftY", String.valueOf((int) qrPosY));
+            params.setProperty("PositionOnPageUpperRightX", String.valueOf((int) qrAncho));
+            params.setProperty("PositionOnPageUpperRightY", String.valueOf((int) qrAlto));
+
+            // 6. Firmar digitalmente el documento con QR (la librería maneja todo)
             LOGGER.log(Level.INFO, "Iniciando firma digital del documento con QR");
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
             PadesBasic padesSigner = new PadesBasic(signer);
@@ -198,7 +215,7 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             ByteArrayInputStream inputStream = new ByteArrayInputStream(docBytes);
             byte[] documentoFirmado = padesSigner.sign(inputStream, signer, certChain, params);
             
-            // 6. Codificar y retornar
+            // 7. Codificar y retornar
             String documentoFirmadoBase64 = Base64.getEncoder().encodeToString(documentoFirmado);
             LOGGER.log(Level.INFO, "Documento firmado con QR exitosamente");
             
@@ -215,40 +232,20 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
         } catch (java.security.UnrecoverableKeyException e) {
             LOGGER.log(Level.SEVERE, "Contraseña incorrecta: {0}", e.getMessage());
             return crearRespuestaError("Contraseña del certificado incorrecta");
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("TSA") || msg.contains("401") || msg.contains("409")) {
+                LOGGER.log(Level.SEVERE, "Error TSA: {0}", msg);
+                return crearRespuestaError("Error del servidor TSA: " + msg);
+            }
+            LOGGER.log(Level.SEVERE, "Error al procesar documento: {0}", e);
+            return crearRespuestaError("Error al procesar documento: " + msg);
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error al procesar documento: {0}", e);
             return crearRespuestaError("Error al procesar documento: " + e.getMessage());
         }
     }
-    
-    /**
-     * Extrae el nombre común (CN) del certificado.
-     */
-    private String extraerNombreFirmante(Certificate cert) {
-        try {
-            if (cert instanceof X509Certificate) {
-                X509Certificate x509cert = (X509Certificate) cert;
-                String dn = x509cert.getSubjectDN().getName();
-                
-                // Buscar CN= en el DN
-                String[] parts = dn.split(",");
-                for (String part : parts) {
-                    part = part.trim();
-                    if (part.startsWith("CN=")) {
-                        return part.substring(3).trim();
-                    }
-                }
-                
-                // Si no encuentra CN, retornar el DN completo
-                return dn;
-            }
-            return "Firmante desconocido";
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al extraer nombre del firmante: {0}", e.getMessage());
-            return "Firmante desconocido";
-        }
-    }
-    
+
     private String crearRespuestaError(String mensaje) {
         JsonObject error = new JsonObject();
         error.addProperty("resultado", "ERROR");
@@ -256,36 +253,4 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
         return new Gson().toJson(error);
     }
     
-    /**
-     * Decodifica una cadena Base64 limpiando caracteres no válidos.
-     * Elimina espacios, saltos de línea y otros caracteres no Base64.
-     */
-    private byte[] decodificarBase64(String base64String) {
-        if (base64String == null || base64String.isEmpty()) {
-            throw new IllegalArgumentException("Cadena Base64 vacía");
-        }
-        
-        // Log de la longitud original para debugging
-        LOGGER.log(Level.INFO, "Longitud Base64 original: {0}", base64String.length());
-        
-        // Limpiar la cadena: eliminar espacios, saltos de línea, retornos de carro, tabulaciones
-        String cleaned = base64String.trim().replaceAll("\\s+", "");
-        
-        LOGGER.log(Level.INFO, "Longitud Base64 después de limpiar: {0}", cleaned.length());
-        
-        try {
-            // Intentar con decoder estándar primero
-            return Base64.getDecoder().decode(cleaned);
-        } catch (IllegalArgumentException e1) {
-            LOGGER.log(Level.WARNING, "Fallo decodificación estándar, intentando con MIME decoder: {0}", e1.getMessage());
-            
-            try {
-                // Intentar con MIME decoder que es más permisivo
-                return Base64.getMimeDecoder().decode(cleaned);
-            } catch (IllegalArgumentException e2) {
-                LOGGER.log(Level.SEVERE, "Error al decodificar Base64 con ambos decoders: {0}", e2.getMessage());
-                throw new IllegalArgumentException("El contenido Base64 no es válido. Verifique que el contenido esté correctamente codificado.");
-            }
-        }
-    }
 }

@@ -31,6 +31,7 @@ public class DatosUsuario {
     private String cargo = "";
     private boolean certificadoDigitalValido;
     private String fechaFirmaArchivoP7M;
+    private String tipoCertificado = "";
 
     public DatosUsuario() {
     }
@@ -95,6 +96,14 @@ public class DatosUsuario {
         this.fechaFirmaArchivoP7M = fechaFirmaArchivoP7M;
     }
 
+    public String getTipoCertificado() {
+        return tipoCertificado;
+    }
+
+    public void setTipoCertificado(String tipoCertificado) {
+        this.tipoCertificado = tipoCertificado;
+    }
+
     @Override
     public String toString() {
         return """
@@ -106,6 +115,7 @@ public class DatosUsuario {
                 + "\t\tcargo=" + cargo + "\n"
                 + "\t\tcertificadoDigitalValido=" + certificadoDigitalValido + "\n"
                 + "\t\tfechaFirmaArchivoP7M=" + fechaFirmaArchivoP7M + "\n"
+                + "\t\ttipoCertificado=" + tipoCertificado + "\n"
                 + "\t\t]";
     }
 }

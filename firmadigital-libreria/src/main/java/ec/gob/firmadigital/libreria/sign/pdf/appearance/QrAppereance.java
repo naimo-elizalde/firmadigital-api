@@ -85,11 +85,12 @@ public class QrAppereance implements CustomAppearance {
 
         // QR - Generar contenido del código QR
         String text = "FIRMADO POR: " + nombreFirmante.trim() + "\n";
-        text = text + "RAZON: " + "Firmado digitalmente con Nexus Soluciones" + "\n";
-        text = text + "LOCALIZACION: " + "ECUADOR" + "\n";
+        text = text + "RAZON: " + (reason != null && !reason.isEmpty() ? reason : "Firma digital") + "\n";
+        text = text + "LOCALIZACION: " + (location != null && !location.isEmpty() ? location : "Ecuador") + "\n";
         text = text + "FECHA: " + signTime + "\n";
-        text = text + "VALIDAR CON: " + "https://www.solucionesnexus.com" + "\n";
-        text = text + infoQR;
+        if (infoQR != null && !infoQR.isEmpty()) {
+            text = text + infoQR;
+        }
 
         try {
             byteQR = QRCode.generateQR(text, (int) signaturePositionOnPage.getHeight(),
@@ -127,8 +128,13 @@ public class QrAppereance implements CustomAppearance {
         textDiv.setVerticalAlignment(VerticalAlignment.MIDDLE);
         textDiv.setHorizontalAlignment(HorizontalAlignment.LEFT);
 
+        Text info = new Text("Validar únicamente con Elizalde&Asociados.\n");
+        Paragraph paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
+                .setFontSize(3.25f);
+        textDiv.add(paragraph);
+
         Text texto = new Text("Firmado electrónicamente por:\n");
-        Paragraph paragraph = new Paragraph().add(texto).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
+        paragraph = new Paragraph().add(texto).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
                 .setFontSize(3.25f);
         textDiv.add(paragraph);
 
@@ -137,10 +143,12 @@ public class QrAppereance implements CustomAppearance {
                 .setFontSize(6.25f);
         textDiv.add(paragraph);
 
-        Text info = new Text("\nValidar únicamente con Nexus Soluciones\n");
-        paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
-                .setFontSize(3.25f);
-        textDiv.add(paragraph);
+        if (location != null && !location.isEmpty()) {
+            Text loc = new Text("\n" + location);
+            paragraph = new Paragraph().add(loc).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
+                    .setFontSize(3.25f);
+            textDiv.add(paragraph);
+        }
 
         try (Canvas textLayoutCanvas = new Canvas(canvas, signatureRect)) {
             textLayoutCanvas.add(textDiv);

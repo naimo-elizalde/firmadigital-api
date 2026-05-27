@@ -97,6 +97,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cms.SignerInformationVerifier;
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
 import org.bouncycastle.util.Store;
 
@@ -434,10 +435,10 @@ public class Utils {
             if (signInfos == null || signInfos.isEmpty()) {
                 return new Documento(false, false, certificados, "Documento sin firmas");
             } else {
+                java.util.List<String> signatureNames = signatureUtil.getSignatureNames();
                 for (SignInfo signInfo : signInfos) {
                     Certificado certificado = signInfoToCertificado(signInfo);
                     try {
-                        java.util.List<String> signatureNames = signatureUtil.getSignatureNames();
                         for (String signatureName : signatureNames) {
                             PdfPKCS7 pdfPKCS7 = signatureUtil.readSignatureData(signatureName);
                             for (X509Certificate certificate : signInfo.getCerts()) {
@@ -453,8 +454,9 @@ public class Utils {
                                         X509CertificateHolder certificateHolder = (X509CertificateHolder) iterator.next();
                                         X509Certificate x509Certificate = new JcaX509CertificateConverter().getCertificate(certificateHolder);
                                         ////////////////////
-                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder));
-                                        tsToken.validate(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder));
+                                        SignerInformationVerifier verifier = new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder);
+                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(verifier);
+                                        tsToken.validate(verifier);
                                         if (tsTohenisSignatureValid) {
                                             List<String> extendedKeyUsages = x509Certificate.getExtendedKeyUsage();
                                             for (String extendedKeyUsage : extendedKeyUsages) {
@@ -462,6 +464,7 @@ public class Utils {
                                                     certificado.getDatosUsuario().setApellido("");
                                                     certificado.setDocTimeStamp(tsToken.getTimeStampInfo().getGenTime());
                                                     certificado.setDocTimeStampIssuedBy(CertEcUtils.getNombreCA(x509Certificate));
+                                                    certificado.setCnTimeStamp(getCN(x509Certificate));
                                                     certificado.setDatosUsuario(infoCertificado(certificado.getDatosUsuario(), signInfo));
                                                     try {
                                                         if (verifySignature(x509Certificate)) {
@@ -655,7 +658,7 @@ public class Utils {
         return datosUsuario;
     }
 
-    public static Certificado signInfoToCertificado(SignInfo signInfo) throws CertificadoInvalidoException, IOException, ConexionException, EntidadCertificadoraNoValidaException {
+    public static Certificado signInfoToCertificado(SignInfo signInfo) throws CertificadoInvalidoException, IOException, EntidadCertificadoraNoValidaException {
         signInfo.getCerts();
         Certificado certificado = null;
         DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(signInfo.getCerts()[0]);
@@ -665,6 +668,12 @@ public class Utils {
             datosUsuario = infoCertificado(datosUsuario, signInfo);
             datosUsuario.setCertificadoDigitalValido(false);
         }
+        Date fechaRevocado = null;
+        try {
+            fechaRevocado = UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null);
+        } catch (ConexionException ex) {
+            LOGGER.log(Level.WARNING, "No se pudo verificar revocación CRL: {0}", ex.getMessage());
+        }
         certificado = new Certificado(
                 signInfo.getCerts()[0].getSerialNumber().toString(),
                 Util.getCN(signInfo.getCerts()[0]),
@@ -672,7 +681,7 @@ public class Utils {
                 dateToCalendar(signInfo.getCerts()[0].getNotBefore()),
                 dateToCalendar(signInfo.getCerts()[0].getNotAfter()),
                 dateToCalendar(signInfo.getSigningTime()),
-                dateToCalendar(UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null)),
+                dateToCalendar(fechaRevocado),
                 esValido(signInfo.getCerts()[0], signInfo.getSigningTime()),
                 datosUsuario);
         certificado.setDocValidTimeStamp(false);
