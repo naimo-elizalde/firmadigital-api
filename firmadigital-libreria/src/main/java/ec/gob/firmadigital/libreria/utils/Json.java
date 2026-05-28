@@ -40,13 +40,11 @@ public class Json {
     private static final DateTimeFormatter ISO8601_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
 
     private static String formatCalendar(Calendar cal) {
-        if (cal == null) return null;
-        return ISO8601_FORMATTER.format(cal.toInstant().atZone(ZoneId.systemDefault()));
+        return cal.toInstant().atZone(ZoneId.systemDefault()).format(ISO8601_FORMATTER);
     }
 
     private static String formatDate(Date date) {
-        if (date == null) return null;
-        return ISO8601_FORMATTER.format(date.toInstant().atZone(ZoneId.systemDefault()));
+        return date.toInstant().atZone(ZoneId.systemDefault()).format(ISO8601_FORMATTER);
     }
 
     public static String generarJsonVersion(String sistemaOperativo, String aplicacion, String versionApp) {
@@ -68,8 +66,7 @@ public class Json {
     public static String generarJsonDocumentoFirmado(byte[] byteDocumentoSigned, Documento documento) {
         //creacion del JSON
         JsonArray gsonArray = new JsonArray();
-        JsonObject jsonObjectDocumento = null;
-        jsonObjectDocumento = new JsonObject();
+        JsonObject jsonObjectDocumento = new JsonObject();
         jsonObjectDocumento.addProperty("signValidate", documento.getSignValidate());
         jsonObjectDocumento.addProperty("docValidate", documento.getDocValidate());
         if (byteDocumentoSigned != null) {
@@ -79,9 +76,8 @@ public class Json {
 
         //Arreglo de Certificado(s)
         JsonArray jsonDocumentoArray = new JsonArray();
-        JsonObject jsonObjectCertificado = null;
         for (Certificado certificado : documento.getCertificados()) {
-            jsonObjectCertificado = new JsonObject();
+            JsonObject jsonObjectCertificado = new JsonObject();
             jsonObjectCertificado.addProperty("issuedTo", certificado.getIssuedTo());
             jsonObjectCertificado.addProperty("issuedBy", certificado.getIssuedBy());
             jsonObjectCertificado.addProperty("validFrom", formatCalendar(certificado.getValidFrom()));
@@ -117,8 +113,7 @@ public class Json {
     public static String generarJsonDocumentoFirmadoTransversal(byte[] byteDocumentoSigned, Documento documento) {
         //creacion del JSON
         JsonArray gsonArray = new JsonArray();
-        JsonObject jsonObjectDocumento = null;
-        jsonObjectDocumento = new JsonObject();
+        JsonObject jsonObjectDocumento = new JsonObject();
         jsonObjectDocumento.addProperty("validarFirma", documento.getSignValidate());
         jsonObjectDocumento.addProperty("validarDocumento", documento.getDocValidate());
         if (byteDocumentoSigned != null) {
@@ -128,9 +123,8 @@ public class Json {
 
         //Arreglo de Certificado(s)
         JsonArray jsonDocumentoArray = new JsonArray();
-        JsonObject jsonObjectCertificado = null;
         for (Certificado certificado : documento.getCertificados()) {
-            jsonObjectCertificado = new JsonObject();
+            JsonObject jsonObjectCertificado = new JsonObject();
             jsonObjectCertificado.addProperty("cedula", certificado.getDatosUsuario().getCedula());
             jsonObjectCertificado.addProperty("nombresApeilldos", certificado.getIssuedTo());
             jsonObjectCertificado.addProperty("emitidoPor", certificado.getIssuedBy());
@@ -157,8 +151,7 @@ public class Json {
     public static String generarJsonCertificado(Certificado certificado) {
         //creacion del JSON
         JsonArray gsonArray = new JsonArray();
-        JsonObject jsonObjectCertificado = null;
-        jsonObjectCertificado = new JsonObject();
+        JsonObject jsonObjectCertificado = new JsonObject();
         jsonObjectCertificado.addProperty("issuedTo", certificado.getIssuedTo());
         jsonObjectCertificado.addProperty("issuedBy", certificado.getIssuedBy());
         jsonObjectCertificado.addProperty("validFrom", formatCalendar(certificado.getValidFrom()));
@@ -210,15 +203,14 @@ public class Json {
     }
 
     public static String generarJsonDatosUsuario(DatosUsuario datosUsuario) {
-        JsonObject jsonObjectDatosUsuario = null;
-        jsonObjectDatosUsuario = new JsonObject();
+        JsonObject jsonObjectDatosUsuario = new JsonObject();
         jsonObjectDatosUsuario.addProperty("cedula", datosUsuario.getCedula());
         jsonObjectDatosUsuario.addProperty("nombre", datosUsuario.getNombre());
         jsonObjectDatosUsuario.addProperty("apellido", datosUsuario.getApellido());
         jsonObjectDatosUsuario.addProperty("institucion", datosUsuario.getInstitucion());
         jsonObjectDatosUsuario.addProperty("cargo", datosUsuario.getCargo());
-        jsonObjectDatosUsuario.addProperty("certificadoDigitalValido", datosUsuario.isCertificadoDigitalValido());
         jsonObjectDatosUsuario.addProperty("tipoCertificado", datosUsuario.getTipoCertificado());
+        jsonObjectDatosUsuario.addProperty("certificadoDigitalValido", datosUsuario.isCertificadoDigitalValido());
         return jsonObjectDatosUsuario.toString();
     }
 

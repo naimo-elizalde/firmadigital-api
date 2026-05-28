@@ -351,8 +351,8 @@ public class CertEcUtils {
             if (certificadoBancoCentral instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(BCE_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(BCE_NAME);
             return datosUsuario;
         }
 
@@ -402,8 +402,8 @@ public class CertEcUtils {
             if (certificadoConsejoJudicatura instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(CJ_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(CJ_NAME);
             return datosUsuario;
         }
 
@@ -433,8 +433,8 @@ public class CertEcUtils {
             if (certificadoSecurityData instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(SECURITYDATA_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(SECURITYDATA_NAME);
             return datosUsuario;
         }
 
@@ -464,8 +464,8 @@ public class CertEcUtils {
             if (certificadoAnfAc18332 instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(ANFAC_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ANFAC_NAME);
             return datosUsuario;
         }
 
@@ -495,8 +495,8 @@ public class CertEcUtils {
             if (certificadoAnfAc37442 instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(ANFAC_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ANFAC_NAME);
             return datosUsuario;
         }
 
@@ -507,8 +507,8 @@ public class CertEcUtils {
                 datosUsuario.setNombre(Utils.getCN(certificado));
                 datosUsuario.setApellido("");
             }
-            datosUsuario.setTipoCertificado(DIGERCIC_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(DIGERCIC_NAME);
             return datosUsuario;
         }
 
@@ -544,8 +544,8 @@ public class CertEcUtils {
             if (certificadoUanataca instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(UANATACA_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(UANATACA_NAME);
             return datosUsuario;
         }
 
@@ -577,8 +577,8 @@ public class CertEcUtils {
             if (certificadoEclipsoft instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(ECLIPSOFT_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ECLIPSOFT_NAME);
             return datosUsuario;
         }
 
@@ -613,8 +613,8 @@ public class CertEcUtils {
             if (certificadoDatil instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(DATIL_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(DATIL_NAME);
             return datosUsuario;
         }
 
@@ -633,8 +633,8 @@ public class CertEcUtils {
                         + certificadoRepresentanteLegal.getSegundoApellido());
                 datosUsuario.setCargo(certificadoRepresentanteLegal.getCargo());
             }
-            datosUsuario.setTipoCertificado(AGOSDATA_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(AGOSDATA_NAME);
             return datosUsuario;
         }
 
@@ -665,8 +665,8 @@ public class CertEcUtils {
                             + certificadoPersonaJuridica.getSegundoApellido());
                 }
             }
-            datosUsuario.setTipoCertificado(LAZZATE_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(LAZZATE_NAME);
             return datosUsuario;
         }
 
@@ -714,8 +714,8 @@ public class CertEcUtils {
                     datosUsuario.setApellido(certificadoPersonaNatural.getPrimerApellido());
                 }
             }
-            datosUsuario.setTipoCertificado(ALPHATECHNOLOGIES_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ALPHATECHNOLOGIES_NAME);
             return datosUsuario;
         }
 
@@ -744,8 +744,8 @@ public class CertEcUtils {
             if (certificadoCorpNewBest instanceof CertificadoSelladoTiempo) {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
-            datosUsuario.setTipoCertificado(CORPNEWBEST_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(CORPNEWBEST_NAME);
             return datosUsuario;
         }
 
@@ -764,8 +764,8 @@ public class CertEcUtils {
                         + certificadoRepresentanteLegal.getSegundoApellido());
                 datosUsuario.setCargo(certificadoRepresentanteLegal.getCargo());
             }
-            datosUsuario.setTipoCertificado(FIRMASEGURA_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(FIRMASEGURA_NAME);
             return datosUsuario;
         }
 
@@ -791,8 +791,8 @@ public class CertEcUtils {
                     datosUsuario.setCargo(certificadoRepresentanteLegal.getCargo());
                 }
             }
-            datosUsuario.setTipoCertificado(LETMI_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(LETMI_NAME);
             return datosUsuario;
         }
 
@@ -818,8 +818,8 @@ public class CertEcUtils {
                     datosUsuario.setCargo(certificadoRepresentanteLegal.getCargo());
                 }
             }
-            datosUsuario.setTipoCertificado(APPFIRMAS_NAME);
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(APPFIRMAS_NAME);
             return datosUsuario;
         }
 

@@ -42,12 +42,6 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * REST Web Service para firmar documentos PDF.
- * Versión standalone usando directamente la librería de firma digital.
- *
- * @author Christian Espinosa, Misael Fernández
- */
 @Path("/appfirmardocumento")
 public class ServicioAppFirmarDocumento extends RequestSizeFilter {
 
@@ -63,59 +57,40 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
             @FormParam("documento") String documentoBase64,
             @FormParam("json") String jsonMetadata
     ) {
-        LOGGER.log(Level.INFO, "Iniciando proceso de firma de documento");
-        
+        LOGGER.log(Level.INFO, "Iniciando firma de documento");
+
         try {
-            // Validar parámetros requeridos
             if (pkcs12Base64 == null || pkcs12Base64.isEmpty()) {
                 return crearRespuestaError("El certificado PKCS#12 es requerido");
             }
             if (password == null || password.isEmpty()) {
-                return crearRespuestaError("La contraseña del certificado es requerida");
+                return crearRespuestaError("La clave del certificado es requerida");
             }
             if (documentoBase64 == null || documentoBase64.isEmpty()) {
                 return crearRespuestaError("El documento a firmar es requerido");
             }
-            
-            // 1. Decodificar certificado PKCS#12
-            LOGGER.log(Level.INFO, "Decodificando certificado PKCS#12");
+
+            // 1. Cargar certificado PKCS#12
             byte[] certBytes = Base64Utils.decodificar(pkcs12Base64);
             KeyStore keyStore = KeyStore.getInstance("PKCS12");
             keyStore.load(new ByteArrayInputStream(certBytes), password.toCharArray());
 
-            // 2. Obtener llave privada y cadena de certificados
-            LOGGER.log(Level.INFO, "Obteniendo llave privada y certificados");
             String alias = keyStore.aliases().nextElement();
             PrivateKey privateKey = (PrivateKey) keyStore.getKey(alias, password.toCharArray());
             Certificate[] certChain = keyStore.getCertificateChain(alias);
-            
+
             if (privateKey == null) {
                 return crearRespuestaError("No se pudo obtener la llave privada del certificado");
             }
             if (certChain == null || certChain.length == 0) {
                 return crearRespuestaError("No se pudo obtener la cadena de certificados");
             }
-            
-            // 3. Extraer cédula del certificado X509 para TSA
-            String identificacion = null;
-            try {
-                DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios((X509Certificate) certChain[0]);
-                if (datosUsuario != null && datosUsuario.getCedula() != null) {
-                    identificacion = datosUsuario.getCedula();
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "No se pudo extraer cédula del certificado: {0}", e.getMessage());
-            }
 
-            // 4. Decodificar documento
-            LOGGER.log(Level.INFO, "Decodificando documento PDF");
+            // 2. Decodificar documento
             byte[] docBytes = Base64Utils.decodificar(documentoBase64);
 
-            // 5. Parsear metadatos (si existen)
+            // 3. Parsear metadatos
             Properties params = new Properties();
-            if (identificacion != null) {
-                params.setProperty("identificacion", identificacion);
-            }
             if (jsonMetadata != null && !jsonMetadata.isEmpty()) {
                 try {
                     JsonObject metadata = new Gson().fromJson(jsonMetadata, JsonObject.class);
@@ -128,52 +103,68 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
                     if (metadata.has("cargo")) {
                         params.setProperty("cargo", metadata.get("cargo").getAsString());
                     }
-                    if (metadata.has("identificacion") && identificacion == null) {
+                    if (metadata.has("identificacion")) {
                         params.setProperty("identificacion", metadata.get("identificacion").getAsString());
                     }
-                    LOGGER.log(Level.INFO, "Metadatos de firma: {0}", metadata);
                 } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "Error al parsear metadatos JSON, se ignorarán: {0}", e.getMessage());
+                    LOGGER.log(Level.WARNING, "Error al parsear metadatos JSON: {0}", e.getMessage());
                 }
             }
-            
-            // 6. Crear firmador y firmar documento
-            LOGGER.log(Level.INFO, "Iniciando firma del documento");
+
+            // 4. Extraer identificacion del certificado si no fue proporcionada
+            if (params.getProperty("identificacion") == null || params.getProperty("identificacion").isEmpty()) {
+                try {
+                    X509Certificate x509Cert = (X509Certificate) certChain[0];
+                    DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(x509Cert);
+                    if (datosUsuario != null && datosUsuario.getCedula() != null && !datosUsuario.getCedula().isEmpty()) {
+                        params.setProperty("identificacion", datosUsuario.getCedula());
+                    }
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "No se pudo extraer identificacion del certificado: {0}", e.getMessage());
+                }
+            }
+
+            // 5. Firmar
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
             PadesBasic padesSigner = new PadesBasic(signer);
-            
-            // Convertir byte[] a InputStream para el método sign
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(docBytes);
-            byte[] documentoFirmado = padesSigner.sign(inputStream, signer, certChain, params);
-            
-            // 7. Codificar y retornar
+            byte[] documentoFirmado = padesSigner.sign(new ByteArrayInputStream(docBytes), signer, certChain, params);
+
+            // 6. Respuesta
             String documentoFirmadoBase64 = Base64.getEncoder().encodeToString(documentoFirmado);
-            LOGGER.log(Level.INFO, "Documento firmado exitosamente");
-            
+
             JsonObject response = new JsonObject();
             response.addProperty("resultado", "OK");
             response.addProperty("mensaje", "Documento firmado exitosamente");
             response.addProperty("documentoFirmado", documentoFirmadoBase64);
-            
+
             return new Gson().toJson(response);
-            
+
         } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE, "Error de formato en los datos: {0}", e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error de formato: {0}", e.getMessage());
             return crearRespuestaError("Error de formato: " + e.getMessage());
         } catch (java.security.UnrecoverableKeyException e) {
-            LOGGER.log(Level.SEVERE, "Contraseña incorrecta: {0}", e.getMessage());
-            return crearRespuestaError("Contraseña del certificado incorrecta");
+            LOGGER.log(Level.SEVERE, "Clave incorrecta: {0}", e.getMessage());
+            return crearRespuestaError("La clave del certificado es incorrecta");
+        } catch (java.io.IOException e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("password") || msg.contains("mac check") || msg.contains("mac verify")) {
+                return crearRespuestaError("La clave del certificado es incorrecta");
+            }
+            if (msg.contains("keystore") || msg.contains("pkcs12") || msg.contains("der")) {
+                return crearRespuestaError("El archivo del certificado esta danado o no es un PKCS#12 valido");
+            }
+            LOGGER.log(Level.SEVERE, "Error de IO: {0}", e);
+            return crearRespuestaError("Error al procesar el documento: " + msg);
         } catch (RuntimeException e) {
             String msg = e.getMessage() != null ? e.getMessage() : "";
-            if (msg.contains("TSA") || msg.contains("401") || msg.contains("409")) {
-                LOGGER.log(Level.SEVERE, "Error TSA: {0}", msg);
-                return crearRespuestaError("Error del servidor TSA: " + msg);
+            if (msg.contains("TSA")) {
+                return crearRespuestaError(msg);
             }
-            LOGGER.log(Level.SEVERE, "Error al firmar documento: {0}", e);
+            LOGGER.log(Level.SEVERE, "Error al firmar: {0}", e);
             return crearRespuestaError("Error al firmar documento: " + msg);
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error al firmar documento: {0}", e);
-            return crearRespuestaError("Error al firmar documento: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error inesperado: {0}", e);
+            return crearRespuestaError("Error interno al firmar documento. Intente nuevamente");
         }
     }
 
@@ -183,5 +174,4 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
         error.addProperty("mensaje", mensaje);
         return new Gson().toJson(error);
     }
-    
 }

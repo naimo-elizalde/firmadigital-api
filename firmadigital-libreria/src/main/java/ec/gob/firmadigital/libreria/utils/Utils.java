@@ -454,9 +454,9 @@ public class Utils {
                                         X509CertificateHolder certificateHolder = (X509CertificateHolder) iterator.next();
                                         X509Certificate x509Certificate = new JcaX509CertificateConverter().getCertificate(certificateHolder);
                                         ////////////////////
-                                        SignerInformationVerifier verifier = new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder);
-                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(verifier);
-                                        tsToken.validate(verifier);
+                                        SignerInformationVerifier tsVerifier = new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder);
+                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(tsVerifier);
+                                        tsToken.validate(tsVerifier);
                                         if (tsTohenisSignatureValid) {
                                             List<String> extendedKeyUsages = x509Certificate.getExtendedKeyUsage();
                                             for (String extendedKeyUsage : extendedKeyUsages) {
@@ -687,8 +687,8 @@ public class Utils {
         Date fechaRevocado = null;
         try {
             fechaRevocado = UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null);
-        } catch (ConexionException ex) {
-            LOGGER.log(Level.WARNING, "No se pudo verificar revocación CRL: {0}", ex.getMessage());
+        } catch (ConexionException e) {
+            LOGGER.log(Level.WARNING, "No se pudo verificar revocacion (red no disponible): {0}", e.getMessage());
         }
         certificado = new Certificado(
                 signInfo.getCerts()[0].getSerialNumber().toString(),

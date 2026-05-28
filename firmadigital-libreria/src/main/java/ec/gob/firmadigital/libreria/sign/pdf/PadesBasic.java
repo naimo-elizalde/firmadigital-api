@@ -27,8 +27,8 @@ import java.util.logging.Logger;
 import com.itextpdf.signatures.BouncyCastleDigest;
 import com.itextpdf.signatures.IExternalSignature;
 import com.itextpdf.signatures.ITSAClient;
-import com.itextpdf.signatures.PdfSigner.CryptoStandard;
 import com.itextpdf.signatures.TSAClientBouncyCastle;
+import com.itextpdf.signatures.PdfSigner.CryptoStandard;
 
 import ec.gob.firmadigital.libreria.sign.RubricaSigner;
 import ec.gob.firmadigital.libreria.sign.pdf.itext.SignerAdapter;
@@ -36,7 +36,7 @@ import ec.gob.firmadigital.libreria.utils.PropertiesUtils;
 import java.util.logging.Level;
 
 /**
- * PaDES Basic Signer
+ * PaDES Basic Signer con soporte de Sellado de Tiempo (TSA)
  */
 public class PadesBasic extends BaseSigner {
 
@@ -61,26 +61,30 @@ public class PadesBasic extends BaseSigner {
             LOGGER.log(Level.SEVERE, "Error al firmar: {0}", e.getMessage());
             throw new RuntimeException(e);
         } catch (RuntimeException e) {
-            String msg = e.getMessage() != null ? e.getMessage() : "";
+            String msg = e.getMessage() + " " + (e.getCause() != null ? e.getCause().getMessage() : "");
             if (msg.contains("401")) {
-                throw new RuntimeException("Credenciales TSA incorrectas (HTTP 401): " + msg, e);
-            }
-            if (msg.contains("409")) {
-                throw new RuntimeException("Hash duplicado en servidor TSA (HTTP 409): " + msg, e);
+                LOGGER.log(Level.SEVERE, "Error de autenticacion TSA (401): Credenciales incorrectas");
+                throw new RuntimeException("Error de autenticacion TSA (401): Credenciales incorrectas.", e);
+            } else if (msg.contains("409")) {
+                LOGGER.log(Level.SEVERE, "Error de conflicto TSA (409): Hash duplicado");
+                throw new RuntimeException("Error de conflicto TSA (409): Hash duplicado.", e);
             }
             throw e;
         }
     }
 
     private ITSAClient createTsaClient(Properties params) {
-        String cedula = params != null ? params.getProperty("identificacion") : null;
-        if (cedula == null || cedula.isBlank()) {
+        if (params == null) {
             return null;
         }
-        String tsaUrl = PropertiesUtils.getConfig().getProperty("tsa_url");
-        if (tsaUrl == null || tsaUrl.isBlank()) {
-            return null;
+        String identificacion = params.getProperty("identificacion");
+        if (identificacion != null && !identificacion.isEmpty()) {
+            String tsaUrl = PropertiesUtils.getConfig().getProperty("tsa_url");
+            if (tsaUrl != null && !tsaUrl.isEmpty()) {
+                LOGGER.log(Level.INFO, "Usando TSA: {0}", tsaUrl);
+                return new TSAClientBouncyCastle(tsaUrl, identificacion, identificacion);
+            }
         }
-        return new TSAClientBouncyCastle(tsaUrl, cedula, cedula);
+        return null;
     }
 }

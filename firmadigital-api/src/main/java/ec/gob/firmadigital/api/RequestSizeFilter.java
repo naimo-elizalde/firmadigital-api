@@ -49,12 +49,12 @@ public class RequestSizeFilter implements ContainerRequestFilter {
             case "appverificardocumento" -> "firmadigital-api-mobile.appverificardocumento.request.size";
             case "appvalidarcertificadodigital" -> "firmadigital-api-mobile.appvalidarcertificadodigital.request.size";
             case "appfirmardocumento" -> "firmadigital-api-mobile.appfirmardocumento.request.size";
+            case "appfirmardocumentoconqr" -> "firmadigital-api-mobile.appfirmardocumento.request.size";
             case "appfirmardocumentotransversal" -> "firmadigital-api-mobile.appfirmardocumentotransversal.request.size";
-            case "appfirmardocumentoconqr" -> "firmadigital-api-mobile.appfirmardocumentoconqr.request.size";
             default -> "firmadigital-api.request.size";
         };
-        int maxRequestSize = (System.getProperty(propertyName)) != null
-                ? Integer.parseInt(System.getProperty(propertyName)) : 512000;//KB
+        String sizeStr = System.getProperty(propertyName);
+        int maxRequestSize = sizeStr != null ? Integer.parseInt(sizeStr) : 512000;//KB
         long contentLength = requestContext.getLength();
         if (requestContext.getMethod().equals("POST")
                 && contentLength > (maxRequestSize * 1024L)) {//KB to BYTE
