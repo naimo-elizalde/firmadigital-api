@@ -29,6 +29,7 @@ public class DatosUsuario {
     private String apellido;
     private String institucion = "";
     private String cargo = "";
+    private String tipoCertificado = "";
     private boolean certificadoDigitalValido;
     private String fechaFirmaArchivoP7M;
 
@@ -83,6 +84,14 @@ public class DatosUsuario {
         this.cargo = cargo;
     }
 
+    public String getTipoCertificado() {
+        return tipoCertificado;
+    }
+
+    public void setTipoCertificado(String tipoCertificado) {
+        this.tipoCertificado = tipoCertificado;
+    }
+
     public boolean isCertificadoDigitalValido() {
         return certificadoDigitalValido;
     }
@@ -104,6 +113,7 @@ public class DatosUsuario {
                 + "\t\tapellido=" + apellido + "\n"
                 + "\t\tinstitucion=" + institucion + "\n"
                 + "\t\tcargo=" + cargo + "\n"
+                + "\t\ttipoCertificado=" + tipoCertificado + "\n"
                 + "\t\tcertificadoDigitalValido=" + certificadoDigitalValido + "\n"
                 + "\t\tfechaFirmaArchivoP7M=" + fechaFirmaArchivoP7M + "\n"
                 + "\t\t]";

@@ -97,6 +97,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cms.SignerInformationVerifier;
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
 import org.bouncycastle.util.Store;
 
@@ -434,10 +435,10 @@ public class Utils {
             if (signInfos == null || signInfos.isEmpty()) {
                 return new Documento(false, false, certificados, "Documento sin firmas");
             } else {
+                java.util.List<String> signatureNames = signatureUtil.getSignatureNames();
                 for (SignInfo signInfo : signInfos) {
                     Certificado certificado = signInfoToCertificado(signInfo);
                     try {
-                        java.util.List<String> signatureNames = signatureUtil.getSignatureNames();
                         for (String signatureName : signatureNames) {
                             PdfPKCS7 pdfPKCS7 = signatureUtil.readSignatureData(signatureName);
                             for (X509Certificate certificate : signInfo.getCerts()) {
@@ -453,8 +454,9 @@ public class Utils {
                                         X509CertificateHolder certificateHolder = (X509CertificateHolder) iterator.next();
                                         X509Certificate x509Certificate = new JcaX509CertificateConverter().getCertificate(certificateHolder);
                                         ////////////////////
-                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder));
-                                        tsToken.validate(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder));
+                                        SignerInformationVerifier tsVerifier = new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder);
+                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(tsVerifier);
+                                        tsToken.validate(tsVerifier);
                                         if (tsTohenisSignatureValid) {
                                             List<String> extendedKeyUsages = x509Certificate.getExtendedKeyUsage();
                                             for (String extendedKeyUsage : extendedKeyUsages) {
@@ -462,6 +464,7 @@ public class Utils {
                                                     certificado.getDatosUsuario().setApellido("");
                                                     certificado.setDocTimeStamp(tsToken.getTimeStampInfo().getGenTime());
                                                     certificado.setDocTimeStampIssuedBy(CertEcUtils.getNombreCA(x509Certificate));
+                                                    certificado.setCnTimeStamp(getCN(x509Certificate));
                                                     certificado.setDatosUsuario(infoCertificado(certificado.getDatosUsuario(), signInfo));
                                                     try {
                                                         if (verifySignature(x509Certificate)) {
@@ -638,24 +641,40 @@ public class Utils {
     }
 
     public static DatosUsuario infoCertificado(DatosUsuario datosUsuario, SignInfo signInfo) {
-        //extraer información del certificado
-        X500Principal issuerX500Principal = signInfo.getCerts()[0].getIssuerX500Principal();//CA
-        X500Name issuerX500name = new X500Name(issuerX500Principal.getName());
-        X500Principal subjectX500Principal = signInfo.getCerts()[0].getSubjectX500Principal();//firmante
+        X500Principal subjectX500Principal = signInfo.getCerts()[0].getSubjectX500Principal();
         X500Name subjectX500name = new X500Name(subjectX500Principal.getName());
-        String cedula = "", nombre = "", entidadCertificadora = "";
         try {
-            nombre = subjectX500name.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString();//CommonName
-            cedula = subjectX500name.getRDNs(BCStyle.SERIALNUMBER)[0].getFirst().getValue().toString();//SerialNumber
-            entidadCertificadora = issuerX500name.getRDNs(BCStyle.O)[0].getFirst().getValue().toString();//OrganizationName
-        } catch (java.lang.ArrayIndexOutOfBoundsException aioobe) {
+            // Cedula (SERIALNUMBER)
+            if (subjectX500name.getRDNs(BCStyle.SERIALNUMBER).length > 0) {
+                datosUsuario.setCedula(subjectX500name.getRDNs(BCStyle.SERIALNUMBER)[0].getFirst().getValue().toString());
+            }
+            // Nombre (GIVENNAME o CN como fallback)
+            if (subjectX500name.getRDNs(BCStyle.GIVENNAME).length > 0) {
+                datosUsuario.setNombre(subjectX500name.getRDNs(BCStyle.GIVENNAME)[0].getFirst().getValue().toString());
+            } else if (subjectX500name.getRDNs(BCStyle.CN).length > 0) {
+                datosUsuario.setNombre(subjectX500name.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+            }
+            // Apellido (SURNAME)
+            if (subjectX500name.getRDNs(BCStyle.SURNAME).length > 0) {
+                datosUsuario.setApellido(subjectX500name.getRDNs(BCStyle.SURNAME)[0].getFirst().getValue().toString());
+            }
+            // Institucion (O = Organization)
+            if (subjectX500name.getRDNs(BCStyle.O).length > 0) {
+                datosUsuario.setInstitucion(subjectX500name.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
+            }
+            // Cargo (T = Title, fallback OU)
+            if (subjectX500name.getRDNs(BCStyle.T).length > 0) {
+                datosUsuario.setCargo(subjectX500name.getRDNs(BCStyle.T)[0].getFirst().getValue().toString());
+            } else if (subjectX500name.getRDNs(BCStyle.OU).length > 0) {
+                datosUsuario.setCargo(subjectX500name.getRDNs(BCStyle.OU)[0].getFirst().getValue().toString());
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error extrayendo datos del Subject DN: {0}", e.getMessage());
         }
-        datosUsuario.setCedula(cedula);
-        datosUsuario.setNombre(nombre);
         return datosUsuario;
     }
 
-    public static Certificado signInfoToCertificado(SignInfo signInfo) throws CertificadoInvalidoException, IOException, ConexionException, EntidadCertificadoraNoValidaException {
+    public static Certificado signInfoToCertificado(SignInfo signInfo) throws CertificadoInvalidoException, IOException, EntidadCertificadoraNoValidaException {
         signInfo.getCerts();
         Certificado certificado = null;
         DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(signInfo.getCerts()[0]);
@@ -665,6 +684,12 @@ public class Utils {
             datosUsuario = infoCertificado(datosUsuario, signInfo);
             datosUsuario.setCertificadoDigitalValido(false);
         }
+        Date fechaRevocado = null;
+        try {
+            fechaRevocado = UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null);
+        } catch (ConexionException e) {
+            LOGGER.log(Level.WARNING, "No se pudo verificar revocacion (red no disponible): {0}", e.getMessage());
+        }
         certificado = new Certificado(
                 signInfo.getCerts()[0].getSerialNumber().toString(),
                 Util.getCN(signInfo.getCerts()[0]),
@@ -672,7 +697,7 @@ public class Utils {
                 dateToCalendar(signInfo.getCerts()[0].getNotBefore()),
                 dateToCalendar(signInfo.getCerts()[0].getNotAfter()),
                 dateToCalendar(signInfo.getSigningTime()),
-                dateToCalendar(UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null)),
+                dateToCalendar(fechaRevocado),
                 esValido(signInfo.getCerts()[0], signInfo.getSigningTime()),
                 datosUsuario);
         certificado.setDocValidTimeStamp(false);

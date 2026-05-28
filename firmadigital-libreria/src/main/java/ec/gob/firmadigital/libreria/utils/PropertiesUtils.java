@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2020 
- * Authors: Ricardo Arguello, Misael Fernández
+ * Copyright (C) 2020
+ * Authors: Ricardo Arguello, Misael Fernandez
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package ec.gob.firmadigital.libreria.utils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,32 +26,50 @@ import java.util.logging.Logger;
 /**
  * Utilidad para menejar properties
  *
- * @author Misael Fernández
+ * @author Misael Fernandez
  */
 public class PropertiesUtils {
 
     private static final Logger LOGGER = Logger.getLogger(PropertiesUtils.class.getName());
     private static final String MESSAGES = "messages.rubrica.properties";
     private static final String CONFIG = "config.rubrica.properties";
-    private static Properties messages;
-    private static Properties config;
+    private static volatile Properties messages;
+    private static volatile Properties config;
 
     public static Properties getMessages() {
-        messages = new Properties();
-        try {
-            messages.load(PropertiesUtils.class.getClassLoader().getResourceAsStream(MESSAGES));
-        } catch (IOException ex) {
-            LOGGER.log(Level.SEVERE, null, ex);
+        if (messages == null) {
+            synchronized (PropertiesUtils.class) {
+                if (messages == null) {
+                    Properties props = new Properties();
+                    try (InputStream is = PropertiesUtils.class.getClassLoader().getResourceAsStream(MESSAGES)) {
+                        if (is != null) {
+                            props.load(is);
+                        }
+                    } catch (IOException ex) {
+                        LOGGER.log(Level.SEVERE, "Error al cargar messages.rubrica.properties", ex);
+                    }
+                    messages = props;
+                }
+            }
         }
         return messages;
     }
 
     public static Properties getConfig() {
-        config = new Properties();
-        try {
-            config.load(PropertiesUtils.class.getClassLoader().getResourceAsStream(CONFIG));
-        } catch (IOException ex) {
-            LOGGER.log(Level.SEVERE, null, ex);
+        if (config == null) {
+            synchronized (PropertiesUtils.class) {
+                if (config == null) {
+                    Properties props = new Properties();
+                    try (InputStream is = PropertiesUtils.class.getClassLoader().getResourceAsStream(CONFIG)) {
+                        if (is != null) {
+                            props.load(is);
+                        }
+                    } catch (IOException ex) {
+                        LOGGER.log(Level.SEVERE, "Error al cargar config.rubrica.properties", ex);
+                    }
+                    config = props;
+                }
+            }
         }
         return config;
     }

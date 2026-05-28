@@ -352,6 +352,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(BCE_NAME);
             return datosUsuario;
         }
 
@@ -402,6 +403,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(CJ_NAME);
             return datosUsuario;
         }
 
@@ -432,6 +434,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(SECURITYDATA_NAME);
             return datosUsuario;
         }
 
@@ -462,6 +465,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ANFAC_NAME);
             return datosUsuario;
         }
 
@@ -492,6 +496,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ANFAC_NAME);
             return datosUsuario;
         }
 
@@ -503,6 +508,7 @@ public class CertEcUtils {
                 datosUsuario.setApellido("");
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(DIGERCIC_NAME);
             return datosUsuario;
         }
 
@@ -539,6 +545,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(UANATACA_NAME);
             return datosUsuario;
         }
 
@@ -571,6 +578,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ECLIPSOFT_NAME);
             return datosUsuario;
         }
 
@@ -606,6 +614,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(DATIL_NAME);
             return datosUsuario;
         }
 
@@ -625,6 +634,7 @@ public class CertEcUtils {
                 datosUsuario.setCargo(certificadoRepresentanteLegal.getCargo());
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(AGOSDATA_NAME);
             return datosUsuario;
         }
 
@@ -656,6 +666,7 @@ public class CertEcUtils {
                 }
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(LAZZATE_NAME);
             return datosUsuario;
         }
 
@@ -704,6 +715,7 @@ public class CertEcUtils {
                 }
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(ALPHATECHNOLOGIES_NAME);
             return datosUsuario;
         }
 
@@ -733,6 +745,7 @@ public class CertEcUtils {
                 datosUsuario.setCertificadoDigitalValido(true);
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(CORPNEWBEST_NAME);
             return datosUsuario;
         }
 
@@ -752,6 +765,7 @@ public class CertEcUtils {
                 datosUsuario.setCargo(certificadoRepresentanteLegal.getCargo());
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(FIRMASEGURA_NAME);
             return datosUsuario;
         }
 
@@ -778,6 +792,7 @@ public class CertEcUtils {
                 }
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(LETMI_NAME);
             return datosUsuario;
         }
 
@@ -804,6 +819,7 @@ public class CertEcUtils {
                 }
             }
             datosUsuario.setCertificadoDigitalValido(true);
+            datosUsuario.setTipoCertificado(APPFIRMAS_NAME);
             return datosUsuario;
         }
 

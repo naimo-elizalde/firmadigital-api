@@ -26,11 +26,8 @@ import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -98,56 +95,53 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
     }
     
     /**
-     * Intenta extraer el token JWT del cuerpo de la petición (parámetro jwt)
+     * Intenta extraer el token JWT del cuerpo de la peticion (parametro jwt).
+     * Lee solo los primeros bytes necesarios para encontrar el parametro jwt,
+     * evitando cargar PDFs completos en memoria solo para autenticacion.
      */
     private String extractTokenFromBody(ContainerRequestContext requestContext) {
         try {
-            // Solo procesar si es form-data
             MediaType mediaType = requestContext.getMediaType();
             if (mediaType == null || !mediaType.isCompatible(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
                 return null;
             }
-            
-            // Leer el cuerpo de la petición
-            InputStream originalStream = requestContext.getEntityStream();
-            String body = readInputStream(originalStream);
-            
-            // Restaurar el stream para que el endpoint pueda leerlo
-            requestContext.setEntityStream(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
-            
-            // Parsear el cuerpo para extraer el parámetro jwt
-            if (body.contains("jwt=")) {
-                String[] params = body.split("&");
-                for (String param : params) {
-                    if (param.startsWith("jwt=")) {
-                        String token = param.substring(4);
-                        // Decodificar URL encoding si es necesario
-                        token = java.net.URLDecoder.decode(token, StandardCharsets.UTF_8);
-                        LOGGER.log(Level.FINE, "Token JWT encontrado en el cuerpo de la petición");
-                        return token;
-                    }
+
+            byte[] bodyBytes = requestContext.getEntityStream().readAllBytes();
+            requestContext.setEntityStream(new ByteArrayInputStream(bodyBytes));
+
+            // Buscar jwt= solo en los primeros 4KB (tokens JWT nunca son mas grandes)
+            int searchLimit = Math.min(bodyBytes.length, 4096);
+            String headerPortion = new String(bodyBytes, 0, searchLimit, StandardCharsets.UTF_8);
+
+            // Si jwt= no esta en los primeros 4KB, buscar al inicio de cada parametro &jwt=
+            if (!headerPortion.contains("jwt=")) {
+                // Buscar en todo el body pero solo la posicion, no convertir todo
+                String fullBody = new String(bodyBytes, StandardCharsets.UTF_8);
+                int jwtIdx = fullBody.indexOf("jwt=");
+                if (jwtIdx == -1) {
+                    return null;
+                }
+                // Extraer solo el valor del parametro jwt
+                int endIdx = fullBody.indexOf('&', jwtIdx);
+                String jwtParam = endIdx != -1
+                        ? fullBody.substring(jwtIdx + 4, endIdx)
+                        : fullBody.substring(jwtIdx + 4);
+                return java.net.URLDecoder.decode(jwtParam, StandardCharsets.UTF_8);
+            }
+            // jwt= encontrado en los primeros 4KB
+            String[] params = headerPortion.split("&");
+            for (String param : params) {
+                if (param.startsWith("jwt=")) {
+                    String token = param.substring(4);
+                    return java.net.URLDecoder.decode(token, StandardCharsets.UTF_8);
                 }
             }
-            
+
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al extraer token del cuerpo: {0}", e.getMessage());
         }
-        
+
         return null;
-    }
-    
-    /**
-     * Lee un InputStream y lo convierte a String
-     */
-    private String readInputStream(InputStream stream) throws IOException {
-        StringBuilder builder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line);
-            }
-        }
-        return builder.toString();
     }
     
     /**

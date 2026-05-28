@@ -19,11 +19,6 @@ package ec.gob.firmadigital.api;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import ec.gob.firmadigital.api.security.Secured;
-import ec.gob.firmadigital.libreria.certificate.CertEcUtils;
-import ec.gob.firmadigital.libreria.certificate.to.DatosUsuario;
-import ec.gob.firmadigital.libreria.crl.ServicioCRL;
-import ec.gob.firmadigital.libreria.exceptions.EntidadCertificadoraNoValidaException;
-import ec.gob.firmadigital.libreria.utils.CertificateUtils;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.POST;
@@ -36,15 +31,10 @@ import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
-import java.security.cert.CRLReason;
-import java.security.cert.X509CRL;
-import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -113,19 +103,16 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
                 LOGGER.log(Level.WARNING, "Certificado aún no vigente");
             }
 
-            // 4. Verificar revocación en servicio CRL
-            RevocacionInfo revocacionInfo = consultarRevocacion(cert);
-            if (revocacionInfo.revocacionConsultada && revocacionInfo.revocado != null && revocacionInfo.revocado) {
+            // 3.1 Verificar revocación por CRL/servicio central
+            EstadoRevocacion estadoRevocacion = consultarRevocacion(cert.getSerialNumber());
+            if (estadoRevocacion.revocado) {
                 valido = false;
-                if ("VIGENTE".equals(estado)) {
-                    estado = "REVOCADO";
-                    motivoNoValido = "El certificado está revocado";
-                } else if (motivoNoValido != null && !motivoNoValido.contains("revocado")) {
-                    motivoNoValido = motivoNoValido + ". Además, el certificado está revocado";
-                }
+                estado = "REVOCADO";
+                motivoNoValido = "El certificado fue revocado";
+                LOGGER.log(Level.WARNING, "Certificado revocado. Serial: {0}", cert.getSerialNumber());
             }
             
-            // 5. Extraer información del certificado
+            // 4. Extraer información del certificado
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
             
             // Extraer información del Subject
@@ -135,7 +122,7 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             // Parsear el CN (Common Name) del subject
             String nombreTitular = extraerCN(subject);
             
-            // 6. Construir respuesta
+            // 5. Construir respuesta
             JsonObject response = new JsonObject();
             response.addProperty("resultado", "OK");
             response.addProperty("valido", valido);
@@ -148,41 +135,20 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             response.addProperty("notAfter", sdf.format(cert.getNotAfter()));
             response.addProperty("version", cert.getVersion());
             response.addProperty("algoritmo", cert.getSigAlgName());
-            response.addProperty("revocacionConsultada", revocacionInfo.revocacionConsultada);
-
-            if (revocacionInfo.revocado != null) {
-                response.addProperty("revocado", revocacionInfo.revocado);
-            }
-
-            if (revocacionInfo.fechaRevocado != null && !revocacionInfo.fechaRevocado.isBlank()) {
-                response.addProperty("fechaRevocado", revocacionInfo.fechaRevocado);
-            }
-
-            if (revocacionInfo.detalleRevocacion != null && !revocacionInfo.detalleRevocacion.isBlank()) {
-                response.addProperty("detalleRevocacion", revocacionInfo.detalleRevocacion);
-            }
             
             if (motivoNoValido != null) {
                 response.addProperty("motivoNoValido", motivoNoValido);
             }
 
-            // 7. Extraer cédula/RUC y datos del titular
-            try {
-                DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(cert);
-                response.addProperty("cedula", datosUsuario.getCedula());
-                response.addProperty("nombre", datosUsuario.getNombre());
-                response.addProperty("apellido", datosUsuario.getApellido());
-                response.addProperty("institucion", datosUsuario.getInstitucion());
-                response.addProperty("cargo", datosUsuario.getCargo());
-            } catch (EntidadCertificadoraNoValidaException e) {
-                LOGGER.log(Level.WARNING, "No se pudo determinar la entidad certificadora: {0}", e.getMessage());
-                response.addProperty("cedula", (String) null);
+            response.addProperty("revocado", estadoRevocacion.revocado);
+            if (estadoRevocacion.fechaRevocado != null) {
+                response.addProperty("fechaRevocado", estadoRevocacion.fechaRevocado);
             }
-
+            
             // Calcular días hasta expiración
             long diasHastaExpiracion = calcularDiasHastaExpiracion(cert.getNotAfter());
             response.addProperty("diasHastaExpiracion", diasHastaExpiracion);
-
+            
             if (diasHastaExpiracion > 0 && diasHastaExpiracion <= 30) {
                 response.addProperty("advertencia", "El certificado expirará en menos de 30 días");
             }
@@ -197,149 +163,6 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
             LOGGER.log(Level.SEVERE, "Error al validar certificado: {0}", e);
             return crearRespuestaError("Error al validar certificado: " + e.getMessage());
         }
-    }
-
-    private RevocacionInfo consultarRevocacion(X509Certificate cert) {
-        RevocacionInfo info = new RevocacionInfo();
-
-        try {
-            // Obtener URLs del certificado + fallback hardcodeado según emisor
-            List<String> crlUrls = new ArrayList<>();
-            try {
-                List<String> urlsDelCert = CertificateUtils.getCrlDistributionPoints(cert);
-                if (urlsDelCert != null) {
-                    crlUrls.addAll(urlsDelCert);
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "No se pudieron extraer URLs CRL del certificado: {0}", e.getMessage());
-            }
-
-            // Agregar URL hardcodeada de ServicioCRL como fallback según el emisor
-            String issuerDN = cert.getIssuerDN().toString().toLowerCase();
-            String fallbackUrl = resolverFallbackCrl(issuerDN);
-            if (fallbackUrl != null && !crlUrls.contains(fallbackUrl)) {
-                crlUrls.add(fallbackUrl);
-            }
-
-            if (crlUrls.isEmpty()) {
-                info.detalleRevocacion = "No se encontraron URLs de CRL en el certificado";
-                return info;
-            }
-
-            BigInteger serial = cert.getSerialNumber();
-            boolean intentoFallido = false;
-
-            for (String crlUrl : crlUrls) {
-                if (crlUrl == null || crlUrl.isBlank()) {
-                    continue;
-                }
-
-                try {
-                    X509CRL crl = ServicioCRL.downloadCrl(crlUrl);
-
-                    X509CRLEntry entry = crl.getRevokedCertificate(serial);
-                    if (entry != null) {
-                        info.revocacionConsultada = true;
-                        info.revocado = true;
-
-                        Date fechaRevocacion = entry.getRevocationDate();
-                        if (fechaRevocacion != null) {
-                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-                            info.fechaRevocado = sdf.format(fechaRevocacion);
-                        }
-
-                        CRLReason razon = entry.getRevocationReason();
-                        info.detalleRevocacion = razon != null ? "Razón CRL: " + razon.name() : "Revocado";
-
-                        return info;
-                    }
-
-                    // Descarga exitosa, no está revocado
-                    info.revocacionConsultada = true;
-                    info.revocado = false;
-                    info.detalleRevocacion = "No revocado en CRL";
-                    return info;
-
-                } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "No fue posible consultar CRL en URL {0}: {1}",
-                            new Object[]{crlUrl, e.getMessage()});
-                    intentoFallido = true;
-                }
-            }
-
-            if (intentoFallido) {
-                info.detalleRevocacion = "No se pudo conectar al servidor CRL";
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error consultando revocación para serial {0}: {1}",
-                    new Object[]{cert.getSerialNumber(), e.getMessage()});
-            info.detalleRevocacion = "No se pudo consultar revocación: " + e.getMessage();
-        }
-
-        return info;
-    }
-
-    private String resolverFallbackCrl(String issuerDN) {
-        if (issuerDN.contains("lazzate")) {
-            if (issuerDN.contains("emisor ca2") || issuerDN.contains("ca2")) {
-                return ServicioCRL.LAZZATECA2_CRL;
-            }
-            if (issuerDN.contains("emisor ca1") || issuerDN.contains("ca1")) {
-                return ServicioCRL.LAZZATECA1_CRL;
-            }
-            return ServicioCRL.LAZZATE_CRL;
-        }
-        if (issuerDN.contains("security data")) {
-            return ServicioCRL.SD_CRL1;
-        }
-        if (issuerDN.contains("bce") || issuerDN.contains("banco central")) {
-            return ServicioCRL.BCE_CRL;
-        }
-        if (issuerDN.contains("registro civil") || issuerDN.contains("digercic")) {
-            return ServicioCRL.DIGERCIC_CRL;
-        }
-        if (issuerDN.contains("consejo de la judicatura") || issuerDN.contains("icert")) {
-            return ServicioCRL.CJ_CRL;
-        }
-        if (issuerDN.contains("anf")) {
-            return ServicioCRL.ANFAC_CRL1;
-        }
-        if (issuerDN.contains("uanataca")) {
-            return ServicioCRL.UANATACA_CRL1;
-        }
-        if (issuerDN.contains("datil")) {
-            return ServicioCRL.DATIL_CRL;
-        }
-        if (issuerDN.contains("argosdata")) {
-            return ServicioCRL.ARGOSDATA_CRL;
-        }
-        if (issuerDN.contains("we-go") || issuerDN.contains("we go")) {
-            return ServicioCRL.LAZZATE_WE_GO_CRL;
-        }
-        if (issuerDN.contains("corpnewbest") || issuerDN.contains("newbest")) {
-            return ServicioCRL.CORPNEWBEST_CRL1;
-        }
-        if (issuerDN.contains("firmasegura")) {
-            return ServicioCRL.FIRMASEGURA_CRL;
-        }
-        if (issuerDN.contains("letmi")) {
-            return ServicioCRL.LETMI2_CRL;
-        }
-        if (issuerDN.contains("appfirmas") || issuerDN.contains("app firmas")) {
-            return ServicioCRL.APP_FIRMAS_CRL;
-        }
-        if (issuerDN.contains("alpha") || issuerDN.contains("globalsign")) {
-            return ServicioCRL.ALPHATECHNOLOGIES_CA2_CRL;
-        }
-        return null;
-    }
-
-    private static class RevocacionInfo {
-
-        private boolean revocacionConsultada;
-        private Boolean revocado;
-        private String fechaRevocado;
-        private String detalleRevocacion;
     }
     
     /**
@@ -364,6 +187,46 @@ public class ServicioAppValidarCertificadoDigital extends RequestSizeFilter {
     private long calcularDiasHastaExpiracion(Date notAfter) {
         long diff = notAfter.getTime() - new Date().getTime();
         return diff / (1000 * 60 * 60 * 24);
+    }
+
+    /**
+     * Consulta el estado de revocación usando el servicio interno de certificados.
+     */
+    private EstadoRevocacion consultarRevocacion(BigInteger serial) {
+        try {
+            ServicioCertificado servicioCertificado = new ServicioCertificado();
+            String revocadoResponse = servicioCertificado.validarCertificado(serial);
+            boolean revocado = Boolean.parseBoolean(revocadoResponse == null ? "false" : revocadoResponse.trim());
+
+            if (!revocado) {
+                return new EstadoRevocacion(false, null);
+            }
+
+            String fechaRevocado = servicioCertificado.validarFechaRevocado(serial);
+            if (fechaRevocado != null) {
+                fechaRevocado = fechaRevocado.trim();
+                if (fechaRevocado.isEmpty() || "null".equalsIgnoreCase(fechaRevocado)) {
+                    fechaRevocado = null;
+                }
+            }
+
+            return new EstadoRevocacion(true, fechaRevocado);
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING,
+                    "No se pudo consultar revocación para serial {0}: {1}",
+                    new Object[]{serial, e.getMessage()});
+            return new EstadoRevocacion(false, null);
+        }
+    }
+
+    private static class EstadoRevocacion {
+        private final boolean revocado;
+        private final String fechaRevocado;
+
+        private EstadoRevocacion(boolean revocado, String fechaRevocado) {
+            this.revocado = revocado;
+            this.fechaRevocado = fechaRevocado;
+        }
     }
     
     private String crearRespuestaError(String mensaje) {

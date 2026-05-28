@@ -43,6 +43,7 @@ public class Certificado {
     private Boolean docValidTimeStamp;//Estampa de tiempo
     private String docTimeStampIssuedBy;//Información de la entidad certificadora (Estampa de tiempo)
     private Date docTimeStamp;//Estampa de tiempo
+    private String cnTimeStamp;//CN del certificado TSA
     private DatosUsuario datosUsuario;
 
     public Certificado() {
@@ -180,6 +181,14 @@ public class Certificado {
         this.docTimeStamp = docTimeStamp;
     }
 
+    public String getCnTimeStamp() {
+        return cnTimeStamp;
+    }
+
+    public void setCnTimeStamp(String cnTimeStamp) {
+        this.cnTimeStamp = cnTimeStamp;
+    }
+
     public DatosUsuario getDatosUsuario() {
         return datosUsuario;
     }
@@ -206,6 +215,7 @@ public class Certificado {
                 + "\tdocValidTimeStamp=" + docValidTimeStamp + "\n"
                 + "\tdocTimeStampIssuedBy=" + docTimeStampIssuedBy + "\n"
                 + "\tdocTimeStamp=" + (docTimeStamp == null ? null : (String) new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format((docTimeStamp))) + "\n"
+                + "\tcnTimeStamp=" + cnTimeStamp + "\n"
                 + "\t" + (datosUsuario == null ? "DatosUsuario[Sin información de usuario]" : datosUsuario.toString()) + "\n"
                 + "\t]"
                 + "\n----------";

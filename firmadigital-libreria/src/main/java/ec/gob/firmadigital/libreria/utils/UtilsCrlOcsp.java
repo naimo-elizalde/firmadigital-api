@@ -177,6 +177,8 @@ public class UtilsCrlOcsp {
         if (!certificado_revocado_url.isEmpty()) {
             URL url = new URL(certificado_revocado_url + "/" + serial);
             HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setConnectTimeout(TIME_OUT);
+            urlConnection.setReadTimeout(TIME_OUT);
             int responseCode = urlConnection.getResponseCode();
 
             if (responseCode >= 300 && responseCode < 400) {

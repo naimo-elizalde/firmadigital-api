@@ -79,7 +79,7 @@ public class Information1Appearance implements CustomAppearance {
                 .setFontSize(3.75f);
         textDiv.add(paragraph);
 
-        contenido = new Text("Validar únicamente con Corporacion Elizalde");
+        contenido = new Text("Validar únicamente con Corporación Elizalde.\nhttps://corporacionelizalde.com/");
         paragraph = new Paragraph().add(contenido).setFont(fontHelvetica).setMargin(0).
                 setMultipliedLeading(0.9f)
                 .setFontSize(2.75f);
