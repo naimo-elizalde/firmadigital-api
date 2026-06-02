@@ -177,24 +177,32 @@ public class UtilsCrlOcsp {
         if (!certificado_revocado_url.isEmpty()) {
             URL url = new URL(certificado_revocado_url + "/" + serial);
             HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-            urlConnection.setConnectTimeout(TIME_OUT);
-            urlConnection.setReadTimeout(TIME_OUT);
-            int responseCode = urlConnection.getResponseCode();
+            HttpURLConnection originalConnection = urlConnection;
+            try {
+                int responseCode = urlConnection.getResponseCode();
 
-            if (responseCode >= 300 && responseCode < 400) {
-                urlConnection = (HttpURLConnection) new URL(urlConnection.getHeaderField("Location")).openConnection();
-                urlConnection.setConnectTimeout(TIME_OUT);
-                responseCode = urlConnection.getResponseCode();
-            }
-            if (responseCode >= 400) {
-                LOGGER.log(Level.SEVERE, "{0}/{1}: Response Code: {2}", new Object[]{certificado_revocado_url, serial, responseCode});
-                throw new ConexionApiException("No se pudo conectar API. " + certificado_revocado_url + " Response Code: " + responseCode);
-            }
+                if (responseCode >= 300 && responseCode < 400) {
+                    HttpURLConnection redirectConnection = (HttpURLConnection) new URL(urlConnection.getHeaderField("Location")).openConnection();
+                    originalConnection.disconnect();
+                    originalConnection = null;
+                    urlConnection = redirectConnection;
+                    urlConnection.setConnectTimeout(TIME_OUT);
+                    responseCode = urlConnection.getResponseCode();
+                }
+                if (responseCode >= 400) {
+                    LOGGER.log(Level.SEVERE, "{0}/{1}: Response Code: {2}", new Object[]{certificado_revocado_url, serial, responseCode});
+                    throw new ConexionApiException("No se pudo conectar API. " + certificado_revocado_url + " Response Code: " + responseCode);
+                }
 
-            try (InputStream is = urlConnection.getInputStream()) {
-                InputStreamReader reader = new InputStreamReader(is);
-                BufferedReader in = new BufferedReader(reader);
-                return in.readLine();
+                try (InputStream is = urlConnection.getInputStream();
+                     BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
+                    return in.readLine();
+                }
+            } finally {
+                urlConnection.disconnect();
+                if (originalConnection != null) {
+                    originalConnection.disconnect();
+                }
             }
         } else {
             return null;

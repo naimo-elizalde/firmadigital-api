@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2024 
- * Authors: Misael Fernández
+ * Copyright (C) 2024
+ * Authors: Misael Fernandez
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,7 +33,7 @@ import ec.gob.firmadigital.libreria.certificate.to.Documento;
 
 /**
  *
- * @author Misael Fernández
+ * @author Misael Fernandez
  */
 public class Json {
 
@@ -64,7 +64,6 @@ public class Json {
     }
 
     public static String generarJsonDocumentoFirmado(byte[] byteDocumentoSigned, Documento documento) {
-        //creacion del JSON
         JsonArray gsonArray = new JsonArray();
         JsonObject jsonObjectDocumento = new JsonObject();
         jsonObjectDocumento.addProperty("signValidate", documento.getSignValidate());
@@ -74,7 +73,6 @@ public class Json {
         }
         jsonObjectDocumento.addProperty("error", documento.getError());
 
-        //Arreglo de Certificado(s)
         JsonArray jsonDocumentoArray = new JsonArray();
         for (Certificado certificado : documento.getCertificados()) {
             JsonObject jsonObjectCertificado = new JsonObject();
@@ -94,7 +92,6 @@ public class Json {
                 jsonObjectCertificado.addProperty("docValidTimeStamp", certificado.getDocValidTimeStamp());
             }
             jsonObjectCertificado.addProperty("signVerify", certificado.getSignVerify());
-//            jsonObjectCertificado.addProperty("docVerify", certificado.getDocVerify());
             jsonObjectCertificado.addProperty("docReason", certificado.getDocReason());
             jsonObjectCertificado.addProperty("docLocation", certificado.getDocLocation());
 
@@ -111,7 +108,6 @@ public class Json {
     }
 
     public static String generarJsonDocumentoFirmadoTransversal(byte[] byteDocumentoSigned, Documento documento) {
-        //creacion del JSON
         JsonArray gsonArray = new JsonArray();
         JsonObject jsonObjectDocumento = new JsonObject();
         jsonObjectDocumento.addProperty("validarFirma", documento.getSignValidate());
@@ -121,7 +117,6 @@ public class Json {
         }
         jsonObjectDocumento.addProperty("error", documento.getError());
 
-        //Arreglo de Certificado(s)
         JsonArray jsonDocumentoArray = new JsonArray();
         for (Certificado certificado : documento.getCertificados()) {
             JsonObject jsonObjectCertificado = new JsonObject();
@@ -130,7 +125,7 @@ public class Json {
             jsonObjectCertificado.addProperty("emitidoPor", certificado.getIssuedBy());
             jsonObjectCertificado.addProperty("validoDesde", formatCalendar(certificado.getValidFrom()));
             jsonObjectCertificado.addProperty("validoHasta", formatCalendar(certificado.getValidTo()));
-            jsonObjectCertificado.addProperty("fechaRevocado", certificado.getRevocated() != null ? formatCalendar(certificado.getRevocated()) : (String) null);
+            jsonObjectCertificado.addProperty("fechaRevocado", certificado.getRevocated() != null ? formatCalendar(certificado.getRevocated()) : null);
             jsonObjectCertificado.addProperty("certificadoDigitalValido", certificado.getDatosUsuario().isCertificadoDigitalValido());
             jsonObjectCertificado.addProperty("fechaDocumentoFirmado", formatCalendar(certificado.getSignGenerated()));
             jsonObjectCertificado.addProperty("razon", certificado.getDocReason());
@@ -149,7 +144,6 @@ public class Json {
     }
 
     public static String generarJsonCertificado(Certificado certificado) {
-        //creacion del JSON
         JsonArray gsonArray = new JsonArray();
         JsonObject jsonObjectCertificado = new JsonObject();
         jsonObjectCertificado.addProperty("issuedTo", certificado.getIssuedTo());
@@ -170,7 +164,6 @@ public class Json {
             jsonObjectCertificado.addProperty("docValidTimeStamp", certificado.getDocValidTimeStamp());
         }
         jsonObjectCertificado.addProperty("signVerify", certificado.getSignVerify());
-//        jsonObjectCertificado.addProperty("docVerify", certificado.getDocVerify());
         jsonObjectCertificado.addProperty("docReason", certificado.getDocReason());
         jsonObjectCertificado.addProperty("docLocation", certificado.getDocLocation());
 
@@ -186,7 +179,6 @@ public class Json {
     }
 
     public static String generarJsonCertificadoTransversal(Certificado certificado) {
-        //creacion del JSON
         JsonArray gsonArray = new JsonArray();
         JsonObject jsonObjectCertificado = null;
         if (certificado.getDatosUsuario() != null) {
@@ -196,7 +188,7 @@ public class Json {
             jsonObjectCertificado.addProperty("emitidoPor", certificado.getIssuedBy());
             jsonObjectCertificado.addProperty("validoDesde", formatCalendar(certificado.getValidFrom()));
             jsonObjectCertificado.addProperty("validoHasta", formatCalendar(certificado.getValidTo()));
-            jsonObjectCertificado.addProperty("fechaRevocado", certificado.getRevocated() != null ? formatCalendar(certificado.getRevocated()) : (String) null);
+            jsonObjectCertificado.addProperty("fechaRevocado", certificado.getRevocated() != null ? formatCalendar(certificado.getRevocated()) : null);
         }
         gsonArray.add(jsonObjectCertificado);
         return gsonArray.toString();

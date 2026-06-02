@@ -46,10 +46,30 @@ public class Download {
 
         if (!fileCfg.exists()) {
             try {
-                byte[] zip = download(PropertiesUtils.getConfig().getProperty("cfg"), false);
-                try (FileOutputStream fileOuputStream = new FileOutputStream(path + ".zip")) {
-                    fileOuputStream.write(zip);
-                    fileOuputStream.close();
+                // Stream ZIP directamente a disco sin byte[] intermediario
+                URL cfgDownloadUrl = new URL(PropertiesUtils.getConfig().getProperty("cfg"));
+                HttpURLConnection cfgCon = (HttpURLConnection) cfgDownloadUrl.openConnection();
+                try {
+                    int cfgCode = cfgCon.getResponseCode();
+                    if (cfgCode >= 300 && cfgCode < 400) {
+                        HttpURLConnection redirectCon = (HttpURLConnection) new URL(cfgCon.getHeaderField("Location")).openConnection();
+                        cfgCon.disconnect();
+                        cfgCon = redirectCon;
+                        cfgCode = cfgCon.getResponseCode();
+                    }
+                    if (cfgCode >= 400) {
+                        throw new IOException("Failed: HTTP error code: " + cfgCode);
+                    }
+                    byte[] dlBuf = new byte[BUFFER_SIZE];
+                    int dlLen;
+                    try (InputStream cfgStream = cfgCon.getInputStream();
+                         FileOutputStream fileOuputStream = new FileOutputStream(path + ".zip")) {
+                        while ((dlLen = cfgStream.read(dlBuf)) != -1) {
+                            fileOuputStream.write(dlBuf, 0, dlLen);
+                        }
+                    }
+                } finally {
+                    cfgCon.disconnect();
                 }
 
                 File filePath = new File(path);
@@ -109,32 +129,38 @@ public class Download {
     private static byte[] download(String strUrl, boolean controlTiempo) throws IOException {
         URL url = new URL(strUrl);
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        if (controlTiempo == true) {
+        if (controlTiempo) {
             con.setConnectTimeout(TIME_OUT);
         }
 
-        int responseCode = con.getResponseCode();
-        if (responseCode >= 300 && responseCode < 400) {
-            con = (HttpURLConnection) new URL(con.getHeaderField("Location")).openConnection();
-            if (controlTiempo == true) {
-                con.setConnectTimeout(TIME_OUT);
+        try {
+            int responseCode = con.getResponseCode();
+            if (responseCode >= 300 && responseCode < 400) {
+                HttpURLConnection redirectCon = (HttpURLConnection) new URL(con.getHeaderField("Location")).openConnection();
+                con.disconnect();
+                con = redirectCon;
+                if (controlTiempo) {
+                    con.setConnectTimeout(TIME_OUT);
+                }
+                responseCode = con.getResponseCode();
             }
-            responseCode = con.getResponseCode();
-        }
-        if (responseCode >= 400) {
-            throw new RuntimeException("Failed : HTTP error code : " + responseCode);
-        }
-
-        byte[] buffer = new byte[BUFFER_SIZE];
-        int count;
-        long size = con.getContentLength();
-        LOGGER.log(Level.INFO, "size={0}", size);
-
-        try (InputStream in = con.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            while ((count = in.read(buffer)) != -1) {
-                out.write(buffer, 0, count);
+            if (responseCode >= 400) {
+                throw new RuntimeException("Failed : HTTP error code : " + responseCode);
             }
-            return out.toByteArray();
+
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int count;
+            long size = con.getContentLength();
+            LOGGER.log(Level.INFO, "size={0}", size);
+
+            try (InputStream in = con.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                while ((count = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, count);
+                }
+                return out.toByteArray();
+            }
+        } finally {
+            con.disconnect();
         }
     }
 }

@@ -21,7 +21,6 @@ import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -80,19 +79,24 @@ public class ValidadorOCSP {
         con.setConnectTimeout(TIME_OUT);
         con.setDoOutput(true);
 
-        OutputStream out = con.getOutputStream();
-        DataOutputStream dataOut = new DataOutputStream(new BufferedOutputStream(out));
-        dataOut.write(array);
-        dataOut.flush();
-        dataOut.close();
+        OCSPResp ocspResponse;
+        try {
+            try (DataOutputStream dataOut = new DataOutputStream(new BufferedOutputStream(con.getOutputStream()))) {
+                dataOut.write(array);
+                dataOut.flush();
+            }
 
-        if (con.getResponseCode() / 100 != 2) {
-            throw new RubricaException("Respuesta HTTP inválida: " + con.getResponseCode());
+            if (con.getResponseCode() / 100 != 2) {
+                throw new RubricaException("Respuesta HTTP inválida: " + con.getResponseCode());
+            }
+
+            // Get Response
+            try (InputStream in = (InputStream) con.getContent()) {
+                ocspResponse = new OCSPResp(in);
+            }
+        } finally {
+            con.disconnect();
         }
-
-        // Get Response
-        InputStream in = (InputStream) con.getContent();
-        OCSPResp ocspResponse = new OCSPResp(in);
 
         //SUCCESSFUL = 0
         //MALFORMED_REQUEST = 1

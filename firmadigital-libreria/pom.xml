@@ -65,6 +65,42 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- Forzar una sola versión de BouncyCastle en todo el proyecto -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcutil-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk15to18</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk15to18</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcutil-jdk15to18</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!--extensiones-->
         <dependency>
@@ -107,19 +143,15 @@
             <exclusions>
                 <exclusion>
                     <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcprov-jdk15on</artifactId>
+                    <artifactId>bcprov-jdk18on</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcpkix-jdk15on</artifactId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>org.bouncycastle</groupId>
-                    <artifactId>bctsp-jdk15on</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcutil-jdk15on</artifactId>
+                    <artifactId>bcutil-jdk18on</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -131,19 +163,15 @@
             <exclusions>
                 <exclusion>
                     <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcprov-jdk15on</artifactId>
+                    <artifactId>bcprov-jdk18on</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcpkix-jdk15on</artifactId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>org.bouncycastle</groupId>
-                    <artifactId>bctsp-jdk15on</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcutil-jdk15on</artifactId>
+                    <artifactId>bcutil-jdk18on</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -155,12 +183,12 @@
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk15to18</artifactId>
+            <artifactId>bcutil-jdk15to18</artifactId>
             <version>${bouncycastle.version}</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcutil-jdk15to18</artifactId>
+            <artifactId>bcpkix-jdk15to18</artifactId>
             <version>${bouncycastle.version}</version>
         </dependency>
         <!-- Dependencias XML -->

@@ -113,7 +113,6 @@ public class DatosUsuario {
                 + "\t\tapellido=" + apellido + "\n"
                 + "\t\tinstitucion=" + institucion + "\n"
                 + "\t\tcargo=" + cargo + "\n"
-                + "\t\ttipoCertificado=" + tipoCertificado + "\n"
                 + "\t\tcertificadoDigitalValido=" + certificadoDigitalValido + "\n"
                 + "\t\tfechaFirmaArchivoP7M=" + fechaFirmaArchivoP7M + "\n"
                 + "\t\t]";

@@ -39,3 +39,6 @@ Thumbs.db
 *.pem
 *.crt
 *.cer
+
+*act_sellado.md
+*qr.md

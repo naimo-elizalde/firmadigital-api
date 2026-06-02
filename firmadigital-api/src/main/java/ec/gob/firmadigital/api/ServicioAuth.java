@@ -82,10 +82,7 @@ public class ServicioAuth {
             
             // Generar token
             String token = JwtUtil.generateToken(subject, expMinutes);
-            
-            LOGGER.log(Level.INFO, "Token JWT generado para subject: {0}, expiración: {1} minutos", 
-                      new Object[]{subject, expMinutes});
-            
+
             // Crear respuesta
             JsonObject response = new JsonObject();
             response.addProperty("resultado", "OK");

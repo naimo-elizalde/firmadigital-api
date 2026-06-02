@@ -35,6 +35,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
 import com.itextpdf.kernel.pdf.PdfReader;
+
 import java.io.ByteArrayInputStream;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -73,6 +74,7 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
             }
 
             byte[] docBytes = Base64Utils.decodificar(documentoBase64);
+
             PadesSigner padesSigner = new PadesSigner();
             List<SignInfo> signInfos = padesSigner.getSigners(docBytes);
 
@@ -83,6 +85,7 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
                 JsonObject response = new JsonObject();
                 response.addProperty("resultado", "OK");
                 response.addProperty("firmasValidas", false);
+                response.addProperty("documentoIntegro", false);
                 response.addProperty("numeroFirmas", 0);
                 response.addProperty("mensaje", documento.getError() != null
                         ? documento.getError()
@@ -105,9 +108,12 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
             for (Certificado cert : documento.getCertificados()) {
                 JsonObject f = new JsonObject();
                 f.addProperty("numeroFirma", firmaIndex++);
+
+                // Datos del firmante
                 f.addProperty("nombreCompleto", cert.getIssuedTo());
                 f.addProperty("entidadCertificadora", cert.getIssuedBy());
 
+                // Fechas del certificado
                 if (cert.getValidFrom() != null) {
                     f.addProperty("fechaEmision", fmtCal(cert.getValidFrom()));
                 }
@@ -118,6 +124,7 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
                     f.addProperty("fechaFirmado", fmtCal(cert.getSignGenerated()));
                 }
 
+                // Revocacion
                 if (cert.getRevocated() != null) {
                     f.addProperty("fechaRevocacion", fmtCal(cert.getRevocated()));
                     f.addProperty("revocado", true);
@@ -125,8 +132,11 @@ public class ServicioAppVerificarDocumento extends RequestSizeFilter {
                     f.addProperty("revocado", false);
                 }
 
+                // Validaciones
                 f.addProperty("certificadoVigente", cert.getCertificateValidated());
                 f.addProperty("integridadFirma", cert.getSignVerify());
+
+                // Metadatos de firma
                 f.addProperty("razon", cert.getDocReason());
                 f.addProperty("localizacion", cert.getDocLocation());
                 f.addProperty("usosLlave", cert.getKeyUsages());

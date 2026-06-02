@@ -18,10 +18,12 @@
 package ec.gob.firmadigital.libreria.sign.pdf.appearance;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.io.InputStream;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.logging.Logger;
 
+import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.geom.Rectangle;
@@ -30,7 +32,6 @@ import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.kernel.pdf.xobject.PdfFormXObject;
 import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.element.Div;
-import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.HorizontalAlignment;
@@ -56,10 +57,10 @@ public class QrAppereance implements CustomAppearance {
         this.reason = reason;
         this.location = location;
         
-        // Si signTime es null o vacío, generar fecha actual
+        // Si signTime es null o vacío, generar fecha actual en hora internacional (UTC)
         if (signTime == null || signTime.trim().isEmpty()) {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-            this.signTime = sdf.format(new Date());
+            this.signTime = ZonedDateTime.now(java.time.ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
         } else {
             this.signTime = signTime;
         }
@@ -80,76 +81,127 @@ public class QrAppereance implements CustomAppearance {
         PdfFont fontCourier = loadFont("fonts/courier.ttf");
         PdfFont fontCourierBold = loadFont("fonts/courier-bold.ttf");
 
-        // Imagen
-        byte[] byteQR = null;
-
         // QR - Generar contenido del código QR
-        String text = "FIRMADO POR: " + nombreFirmante.trim() + "\n";
-        text = text + "RAZON: " + (reason != null && !reason.isEmpty() ? reason : "Firma digital") + "\n";
-        text = text + "LOCALIZACION: " + (location != null && !location.isEmpty() ? location : "Ecuador") + "\n";
-        text = text + "FECHA: " + signTime + "\n";
-        text = text + "VALIDAR CON: https://corporacionelizalde.com/\n";
-        if (infoQR != null && !infoQR.isEmpty()) {
-            text = text + infoQR;
+        StringBuilder sb = new StringBuilder();
+        sb.append("FIRMADO POR: ").append(nombreFirmante.trim()).append("\n");
+        sb.append("RAZON: ").append(reason != null && !reason.isEmpty() ? reason : "Firma digital").append("\n");
+        if (location != null && !location.isEmpty()) {
+            sb.append("LOCALIZACION: ").append(location).append("\n");
         }
+        sb.append("FECHA: ").append(signTime).append("\n");
+        sb.append("VALIDAR CON: ").append("https://corporacionelizalde.com/").append("\n");
+        sb.append(infoQR);
+        String text = sb.toString();
 
+        byte[] byteQR = null;
         try {
-            byteQR = QRCode.generateQR(text, (int) signaturePositionOnPage.getHeight(),
-                    (int) signaturePositionOnPage.getHeight());
+            byteQR = QRCode.generateQR(text, 300, 300);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al generar QR: {0}", e);
         }
 
-        // QR - Definir rectángulos para QR y texto
-        Rectangle dataRect = new Rectangle(0, 0, signaturePositionOnPage.getWidth() / 3,
-                signaturePositionOnPage.getHeight());
-
-        // Aumentar separación entre QR y texto (ajustar el valor de división para más o menos espacio)
-        float separacion = signaturePositionOnPage.getWidth() / 2.8f;
-        Rectangle signatureRect = new Rectangle(separacion, 0,
-                signaturePositionOnPage.getWidth() - separacion, signaturePositionOnPage.getHeight());
-
-        Div imageDiv = new Div();
-        imageDiv.setHeight(dataRect.getHeight());
-        imageDiv.setWidth(dataRect.getWidth());
-        imageDiv.setVerticalAlignment(VerticalAlignment.MIDDLE);
-        imageDiv.setHorizontalAlignment(HorizontalAlignment.CENTER);
-
-        Image image = new Image(ImageDataFactory.create(byteQR));
-        image.setAutoScale(true);
-        imageDiv.add(image);
-
-        try (Canvas imageLayoutCanvas = new Canvas(canvas, dataRect)) {
-            imageLayoutCanvas.add(imageDiv);
+        // Cargar logo Elizalde desde resources
+        byte[] logoBytes = null;
+        try (InputStream logoStream = getClass().getClassLoader().getResourceAsStream("images/logo-elizalde.png")) {
+            if (logoStream != null) {
+                logoBytes = logoStream.readAllBytes();
+            } else {
+                LOGGER.log(Level.WARNING, "No se encontró logo-elizalde.png en resources/images/");
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error al cargar logo: {0}", e.getMessage());
         }
+
+        float totalWidth = signaturePositionOnPage.getWidth();
+        float totalHeight = signaturePositionOnPage.getHeight();
+
+        // QR cuadrado + logo mismo ancho, todo cabe en totalHeight
+        // Logo 220x72 → ratio alto/ancho = 0.3273
+        // qrSide + gap + qrSide*0.3273 = totalHeight
+        // qrSide = (totalHeight - gap) / 1.3273
+        float gap = 2f;
+        float logoRatio = 72f / 220f;
+        float qrSide = (totalHeight - gap) / (1f + logoRatio);
+        float logoH = qrSide * logoRatio;
+        float leftWidth = qrSide;
+
+        // QR — dibujado con Canvas + scaleToFit (mantiene proporción, sin deformar)
+        if (byteQR != null) {
+            Rectangle qrRect = new Rectangle(0, logoH + gap, qrSide, qrSide);
+            com.itextpdf.layout.element.Image qrImage = new com.itextpdf.layout.element.Image(ImageDataFactory.create(byteQR));
+            qrImage.scaleToFit(qrSide, qrSide);
+            qrImage.setMargins(0, 0, 0, 0);
+            try (Canvas qrCanvas = new Canvas(canvas, qrRect)) {
+                qrCanvas.add(qrImage);
+            }
+        }
+
+        // Logo — scaleToFit mismo ancho que QR, mantiene proporción
+        if (logoBytes != null) {
+            Rectangle logoRect = new Rectangle(0, 0, qrSide, logoH);
+            com.itextpdf.layout.element.Image logoImage = new com.itextpdf.layout.element.Image(ImageDataFactory.create(logoBytes));
+            logoImage.scaleToFit(qrSide, logoH);
+            logoImage.setMargins(0, 0, 0, 0);
+            try (Canvas logoCanvas = new Canvas(canvas, logoRect)) {
+                logoCanvas.add(logoImage);
+            }
+        }
+
+        // Lado derecho: texto — pegado al QR
+        float separacion = leftWidth + 2f;
+        Rectangle signatureRect = new Rectangle(separacion, 0,
+                totalWidth - separacion, totalHeight);
 
         Div textDiv = new Div();
         textDiv.setHeight(signatureRect.getHeight());
         textDiv.setWidth(signatureRect.getWidth());
         textDiv.setVerticalAlignment(VerticalAlignment.MIDDLE);
-        textDiv.setHorizontalAlignment(HorizontalAlignment.CENTER);
+        textDiv.setHorizontalAlignment(HorizontalAlignment.LEFT);
+        textDiv.setPaddingLeft(2f);
 
-        Text info = new Text("Validar únicamente con Corporación Elizalde.\n");
-        Paragraph paragraph = new Paragraph().add(info).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
-                .setFontSize(3.25f);
-        textDiv.add(paragraph);
+        // "Firmado electrónicamente por:"
+        Text firmado = new Text("Firmado electrónicamente por:");
+        Paragraph pFirmado = new Paragraph().add(firmado).setFont(fontCourier).setMargin(0)
+                .setMultipliedLeading(1.0f).setFontSize(3.25f);
+        textDiv.add(pFirmado);
 
-        Text texto = new Text("Firmado electrónicamente por:\n");
-        paragraph = new Paragraph().add(texto).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
-                .setFontSize(3.25f);
-        textDiv.add(paragraph);
-
-        Text contenido = new Text(nombreFirmante.trim());
-        paragraph = new Paragraph().add(contenido).setFont(fontCourierBold).setMargin(0).setMultipliedLeading(0.9f)
-                .setFontSize(6.25f);
-        textDiv.add(paragraph);
-
-        if (location != null && !location.isEmpty()) {
-            Text loc = new Text("\n" + location);
-            paragraph = new Paragraph().add(loc).setFont(fontCourier).setMargin(0).setMultipliedLeading(0.9f)
-                    .setFontSize(3.25f);
-            textDiv.add(paragraph);
+        // Nombre en bold — dividir en dos líneas por mitad de palabras
+        String nombreTrimmed = nombreFirmante.trim();
+        String[] palabras = nombreTrimmed.split("\\s+");
+        String linea1, linea2;
+        if (palabras.length >= 2) {
+            int mitad = palabras.length / 2;
+            StringBuilder sb1 = new StringBuilder();
+            StringBuilder sb2 = new StringBuilder();
+            for (int i = 0; i < palabras.length; i++) {
+                if (i < mitad) {
+                    if (sb1.length() > 0) sb1.append(" ");
+                    sb1.append(palabras[i]);
+                } else {
+                    if (sb2.length() > 0) sb2.append(" ");
+                    sb2.append(palabras[i]);
+                }
+            }
+            linea1 = sb1.toString();
+            linea2 = sb2.toString();
+        } else {
+            linea1 = nombreTrimmed;
+            linea2 = null;
         }
+        Paragraph pNombre = new Paragraph().add(new Text(linea1)).setFont(fontCourierBold).setMargin(0)
+                .setMultipliedLeading(0.9f).setFontSize(6.25f);
+        textDiv.add(pNombre);
+        if (linea2 != null) {
+            Paragraph pNombre2 = new Paragraph().add(new Text(linea2)).setFont(fontCourierBold).setMargin(0)
+                    .setMultipliedLeading(0.9f).setFontSize(6.25f);
+            textDiv.add(pNombre2);
+        }
+
+        // Fecha
+        Text fecha = new Text("Fecha: " + signTime);
+        Paragraph pFecha = new Paragraph().add(fecha).setFont(fontCourier).setMargin(0)
+                .setMultipliedLeading(1.0f).setFontSize(3.25f).setPaddingTop(2f);
+        textDiv.add(pFecha);
 
         try (Canvas textLayoutCanvas = new Canvas(canvas, signatureRect)) {
             textLayoutCanvas.add(textDiv);

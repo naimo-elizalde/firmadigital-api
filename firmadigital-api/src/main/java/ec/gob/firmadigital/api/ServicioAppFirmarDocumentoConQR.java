@@ -115,12 +115,9 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
                     if (metadata.has("identificacion")) {
                         params.setProperty("identificacion", metadata.get("identificacion").getAsString());
                     }
-
-                    // Metadatos del QR
                     if (metadata.has("infoQR")) {
                         params.setProperty("infoQR", metadata.get("infoQR").getAsString());
                     }
-
                     if (metadata.has("qrPagina")) {
                         int qrPagina = metadata.get("qrPagina").getAsInt();
                         if (qrPagina > 0) {
@@ -150,10 +147,14 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
                 }
             }
 
-            params.setProperty("PositionOnPageLowerLeftX", String.valueOf((int)qrPosX));
-            params.setProperty("PositionOnPageLowerLeftY", String.valueOf((int)qrPosY));
-            params.setProperty("PositionOnPageUpperRightX", String.valueOf((int)qrAncho));
-            params.setProperty("PositionOnPageUpperRightY", String.valueOf((int)qrAlto));
+            // Forzar tamaño mínimo para que la firma sea legible
+            if (qrAncho < 150f) qrAncho = 150f;
+            if (qrAlto < 55f) qrAlto = 55f;
+
+            params.setProperty("PositionOnPageLowerLeftX", String.valueOf((int) qrPosX));
+            params.setProperty("PositionOnPageLowerLeftY", String.valueOf((int) qrPosY));
+            params.setProperty("PositionOnPageUpperRightX", String.valueOf((int) qrAncho));
+            params.setProperty("PositionOnPageUpperRightY", String.valueOf((int) qrAlto));
 
             // 5. Firmar
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
@@ -167,7 +168,6 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             response.addProperty("resultado", "OK");
             response.addProperty("mensaje", "Documento firmado con QR exitosamente");
             response.addProperty("documentoFirmado", documentoFirmadoBase64);
-
             return new Gson().toJson(response);
 
         } catch (IllegalArgumentException e) {
