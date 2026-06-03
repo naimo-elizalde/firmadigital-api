@@ -12,11 +12,14 @@ public class Base64Utils {
         if (base64String == null || base64String.isEmpty()) {
             throw new IllegalArgumentException("Cadena Base64 vacia");
         }
+
         String cleaned = base64String.replaceAll("\\s+", "");
+
         try {
             return Base64.getDecoder().decode(cleaned);
         } catch (IllegalArgumentException e1) {
             LOGGER.log(Level.WARNING, "Fallo decodificacion estandar, intentando con MIME decoder: {0}", e1.getMessage());
+
             try {
                 return Base64.getMimeDecoder().decode(cleaned);
             } catch (IllegalArgumentException e2) {

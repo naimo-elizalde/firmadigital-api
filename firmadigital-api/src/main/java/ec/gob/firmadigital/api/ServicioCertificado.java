@@ -25,6 +25,7 @@ import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
+import ec.gob.firmadigital.api.security.Secured;
 
 /**
  * Este servicio permite verificar si un certificado está revocado.

@@ -51,21 +51,13 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
     
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
-        String requestPath = requestContext.getUriInfo().getPath();
-        LOGGER.log(Level.INFO, "=== JWT Filter - Validando petición a: {0}", requestPath);
-        
         // Intentar obtener el token del header Authorization
         String authHeader = requestContext.getHeaderString("Authorization");
         String token = null;
-        
-        LOGGER.log(Level.INFO, "Authorization header: {0}", authHeader != null ? "Presente" : "Ausente");
-        
+
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            LOGGER.log(Level.INFO, "✓ Token JWT encontrado en header Authorization (primeros 20 chars): {0}...", 
-                      token.substring(0, Math.min(20, token.length())));
         } else {
-            LOGGER.log(Level.INFO, "Token no encontrado en header, intentando body...");
             // Si no está en el header, intentar obtenerlo del cuerpo de la petición
             token = extractTokenFromBody(requestContext);
         }
@@ -77,8 +69,6 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
             return;
         }
         
-        LOGGER.log(Level.INFO, "Validando token con JwtUtil...");
-        
         // Validar el token usando JwtUtil
         if (!JwtUtil.validateToken(token)) {
             LOGGER.log(Level.WARNING, "✗ Token JWT inválido o expirado");
@@ -86,11 +76,8 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
             return;
         }
         
-        // Token válido - continuar con la petición
+        // Token válido - agregar información del usuario al contexto
         String subject = JwtUtil.getSubjectFromToken(token);
-        LOGGER.log(Level.INFO, "✓ Token JWT validado correctamente para subject: {0}", subject);
-        
-        // Opcionalmente, agregar información del usuario al contexto
         requestContext.setProperty("jwt.subject", subject);
     }
     
@@ -128,6 +115,7 @@ public class JwtAuthenticationFilter implements ContainerRequestFilter {
                         : fullBody.substring(jwtIdx + 4);
                 return java.net.URLDecoder.decode(jwtParam, StandardCharsets.UTF_8);
             }
+
             // jwt= encontrado en los primeros 4KB
             String[] params = headerPortion.split("&");
             for (String param : params) {

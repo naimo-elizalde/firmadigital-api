@@ -61,7 +61,6 @@ public class JwtUtil {
             // Usar el secret directamente como UTF-8 (compatible con NestJS/Node.js)
             byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             secretKey = Keys.hmacShaKeyFor(keyBytes);
-            LOGGER.log(Level.INFO, "JWT secret key inicializada correctamente desde variable de entorno (UTF-8)");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "CRÍTICO: No se pudo inicializar JWT secret key: {0}", e.getMessage());
             throw new RuntimeException(
@@ -77,17 +76,12 @@ public class JwtUtil {
     private static String loadSecretFromEnvironment() {
         // Intentar primero desde variable de entorno
         String secret = System.getenv(JWT_SECRET_ENV_VAR);
-        
+
         // Si no está en variable de entorno, intentar system property
         if (secret == null || secret.trim().isEmpty()) {
             secret = System.getProperty(JWT_SECRET_ENV_VAR);
-            if (secret != null) {
-                LOGGER.log(Level.INFO, "JWT_SECRET cargado desde System Property");
-            }
-        } else {
-            LOGGER.log(Level.INFO, "JWT_SECRET cargado desde variable de entorno");
         }
-        
+
         if (secret == null || secret.trim().isEmpty()) {
             LOGGER.log(Level.SEVERE, 
                 "Variable de entorno o System Property {0} no configurada. La aplicación no puede procesar tokens JWT.",
@@ -95,11 +89,6 @@ public class JwtUtil {
             );
             return null;
         }
-        
-        // Log de los primeros caracteres para debug (sin exponer todo el secreto)
-        LOGGER.log(Level.INFO, "JWT_SECRET encontrado (primeros 10 chars): {0}...", 
-                  secret.substring(0, Math.min(10, secret.length())));
-        LOGGER.log(Level.INFO, "JWT_SECRET longitud: {0} caracteres", secret.length());
         
         // Validar longitud mínima (256 bits = 32 bytes = 32 caracteres para UTF-8)
         if (secret.length() < 32) {
@@ -125,27 +114,16 @@ public class JwtUtil {
             return false;
         }
         
-        LOGGER.log(Level.INFO, "=== JwtUtil.validateToken - Iniciando validación ===");
-        LOGGER.log(Level.INFO, "Token (primeros 30 chars): {0}...", token.substring(0, Math.min(30, token.length())));
-        
         try {
             // Limpiar el token (remover "Bearer " si existe)
             token = cleanToken(token);
-            
-            LOGGER.log(Level.INFO, "Token después de limpiar: {0}...", token.substring(0, Math.min(30, token.length())));
-            LOGGER.log(Level.INFO, "SecretKey presente: {0}", secretKey != null ? "SÍ" : "NO");
-            
+
             // Parsear y validar el token
             Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-            
-            LOGGER.log(Level.INFO, "Claims extraídos exitosamente");
-            LOGGER.log(Level.INFO, "Subject: {0}", claims.getSubject());
-            LOGGER.log(Level.INFO, "ID: {0}", claims.getId());
-            LOGGER.log(Level.INFO, "Expiration: {0}", claims.getExpiration());
             
             // Verificar expiración
             Date expiration = claims.getExpiration();
@@ -155,7 +133,6 @@ public class JwtUtil {
                 return false;
             }
             
-            LOGGER.log(Level.INFO, "✓ Token validado correctamente para subject: {0}", claims.getSubject());
             return true;
             
         } catch (ExpiredJwtException e) {

@@ -53,7 +53,9 @@ public class PadesBasic extends BaseSigner {
             Certificate[] certChain, Properties params) throws IOException {
         try {
             ITSAClient tsaClient = createTsaClient(params);
+
             int estimatedSize = tsaClient != null ? 16384 : 0;
+
             pdfSigner.signDetached(new BouncyCastleDigest(), externalSignature, certChain, null, null, tsaClient,
                     estimatedSize, CryptoStandard.CMS);
             return os.toByteArray();

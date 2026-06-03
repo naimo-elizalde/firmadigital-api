@@ -97,7 +97,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.cms.SignerInformationVerifier;
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
 import org.bouncycastle.util.Store;
 
@@ -140,8 +139,10 @@ public class Utils {
         }
 
         // Es una URL
-        InputStream tmpStream = new BufferedInputStream(uri.toURL().openStream());
-        byte[] tmpBuffer = getDataFromInputStream(tmpStream);
+        byte[] tmpBuffer;
+        try (InputStream tmpStream = new BufferedInputStream(uri.toURL().openStream())) {
+            tmpBuffer = getDataFromInputStream(tmpStream);
+        }
         return new ByteArrayInputStream(tmpBuffer);
     }
 
@@ -354,13 +355,8 @@ public class Utils {
             return null;
         }
         X509Certificate cert;
-        try (InputStream isCert = new ByteArrayInputStream(Base64.getDecoder().decode(b64Cert));) {
+        try (InputStream isCert = new ByteArrayInputStream(Base64.getDecoder().decode(b64Cert))) {
             cert = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(isCert);
-            try {
-                isCert.close();
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Error cerrando el flujo de lectura del certificado: {0}", e);
-            }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "No se pudo decodificar el certificado en Base64, se devolvera null: {0}", e);
             return null;
@@ -435,10 +431,10 @@ public class Utils {
             if (signInfos == null || signInfos.isEmpty()) {
                 return new Documento(false, false, certificados, "Documento sin firmas");
             } else {
-                java.util.List<String> signatureNames = signatureUtil.getSignatureNames();
                 for (SignInfo signInfo : signInfos) {
                     Certificado certificado = signInfoToCertificado(signInfo);
                     try {
+                        java.util.List<String> signatureNames = signatureUtil.getSignatureNames();
                         for (String signatureName : signatureNames) {
                             PdfPKCS7 pdfPKCS7 = signatureUtil.readSignatureData(signatureName);
                             for (X509Certificate certificate : signInfo.getCerts()) {
@@ -454,9 +450,8 @@ public class Utils {
                                         X509CertificateHolder certificateHolder = (X509CertificateHolder) iterator.next();
                                         X509Certificate x509Certificate = new JcaX509CertificateConverter().getCertificate(certificateHolder);
                                         ////////////////////
-                                        SignerInformationVerifier tsVerifier = new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder);
-                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(tsVerifier);
-                                        tsToken.validate(tsVerifier);
+                                        boolean tsTohenisSignatureValid = tsToken.isSignatureValid(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder));
+                                        tsToken.validate(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certificateHolder));
                                         if (tsTohenisSignatureValid) {
                                             List<String> extendedKeyUsages = x509Certificate.getExtendedKeyUsage();
                                             for (String extendedKeyUsage : extendedKeyUsages) {
@@ -674,7 +669,7 @@ public class Utils {
         return datosUsuario;
     }
 
-    public static Certificado signInfoToCertificado(SignInfo signInfo) throws CertificadoInvalidoException, IOException, EntidadCertificadoraNoValidaException {
+    public static Certificado signInfoToCertificado(SignInfo signInfo) throws CertificadoInvalidoException, IOException, ConexionException, EntidadCertificadoraNoValidaException {
         signInfo.getCerts();
         Certificado certificado = null;
         DatosUsuario datosUsuario = CertEcUtils.getDatosUsuarios(signInfo.getCerts()[0]);
@@ -684,12 +679,6 @@ public class Utils {
             datosUsuario = infoCertificado(datosUsuario, signInfo);
             datosUsuario.setCertificadoDigitalValido(false);
         }
-        Date fechaRevocado = null;
-        try {
-            fechaRevocado = UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null);
-        } catch (ConexionException e) {
-            LOGGER.log(Level.WARNING, "No se pudo verificar revocacion (red no disponible): {0}", e.getMessage());
-        }
         certificado = new Certificado(
                 signInfo.getCerts()[0].getSerialNumber().toString(),
                 Util.getCN(signInfo.getCerts()[0]),
@@ -697,7 +686,7 @@ public class Utils {
                 dateToCalendar(signInfo.getCerts()[0].getNotBefore()),
                 dateToCalendar(signInfo.getCerts()[0].getNotAfter()),
                 dateToCalendar(signInfo.getSigningTime()),
-                dateToCalendar(fechaRevocado),
+                dateToCalendar(UtilsCrlOcsp.validarFechaRevocado(signInfo.getCerts()[0], null)),
                 esValido(signInfo.getCerts()[0], signInfo.getSigningTime()),
                 datosUsuario);
         certificado.setDocValidTimeStamp(false);
@@ -825,19 +814,19 @@ public class Utils {
                     //certificado digital sin ser revocado, integridad de la firma, dentro de fecha de figencia, válido por CA
                     boolean revocado = validarFirma(certificado.getValidFrom(), certificado.getValidTo(), certificado.getSignGenerated(), certificado.getRevocated());
                     if (pdf) {
-                        if (!revocado || !certificado.getSignVerify() || !certificado.getCertificateValidated() || !certificado.getDatosUsuario().isCertificadoDigitalValido()) {
+                        if (!revocado || !certificado.getSignVerify() || !certificado.getCertificateValidated()) {
                             retorno = false;
                             break;
                         }
                     } else {
-                        if (!revocado || !certificado.getCertificateValidated() || !certificado.getDatosUsuario().isCertificadoDigitalValido()) {
+                        if (!revocado || !certificado.getCertificateValidated()) {
                             retorno = false;
                             break;
                         }
                     }
                 } else {// sellos de tiempo
                     //dentro de fecha de figencia, válido por CA
-                    if (!certificado.getCertificateValidated() || !certificado.getDatosUsuario().isCertificadoDigitalValido()) {
+                    if (!certificado.getCertificateValidated()) {
                         retorno = false;
                         break;
                     }

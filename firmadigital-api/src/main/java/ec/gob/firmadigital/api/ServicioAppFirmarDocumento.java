@@ -136,7 +136,6 @@ public class ServicioAppFirmarDocumento extends RequestSizeFilter {
             response.addProperty("resultado", "OK");
             response.addProperty("mensaje", "Documento firmado exitosamente");
             response.addProperty("documentoFirmado", documentoFirmadoBase64);
-
             return new Gson().toJson(response);
 
         } catch (IllegalArgumentException e) {

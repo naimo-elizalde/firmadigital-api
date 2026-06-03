@@ -3,7 +3,11 @@
     <deployment>
         <exclusions>
             <module name="org.bouncycastle" />
-            <module name="org.bouncycastle.pkix" />
+            <module name="org.bouncycastle.bcprov" />
+            <module name="org.bouncycastle.bcpkix" />
+            <module name="org.bouncycastle.bcutil" />
+            <module name="org.bouncycastle.bcmail" />
+            <module name="org.bouncycastle.bcpg" />
         </exclusions>
     </deployment>
 </jboss-deployment-structure>

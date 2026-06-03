@@ -18,7 +18,7 @@ package ec.gob.firmadigital.api;
 
 /**
  *
- * @author Misael Fernández
+ * @author Misael Fernandez
  */
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -43,6 +43,7 @@ public class RequestSizeFilter implements ContainerRequestFilter {
      *
      * Nombre de las propiedades que contiene el servicio web (valor en KB)
      */
+
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
         String propertyName = switch (requestContext.getUriInfo().getMatchedURIs().get(0)) {

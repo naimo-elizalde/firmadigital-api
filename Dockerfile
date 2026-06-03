@@ -32,6 +32,9 @@ ENV DEPLOYMENT_DIR=${WILDFLY_HOME}/standalone/deployments
 # Crear usuario administrador de WildFly (opcional, para acceso a consola)
 RUN ${WILDFLY_HOME}/bin/add-user.sh admin Admin#2024 --silent
 
+# Aumentar max-post-size a 500MB para permitir documentos grandes
+RUN ${WILDFLY_HOME}/bin/jboss-cli.sh --commands="embed-server,/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=max-post-size,value=524288000),/subsystem=undertow/server=default-server/https-listener=https:write-attribute(name=max-post-size,value=524288000),stop-embedded-server"
+
 # Copiar el WAR compilado desde el stage de build
 COPY --from=builder /build/firmadigital-api/target/api.war ${DEPLOYMENT_DIR}/
 
