@@ -5,12 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: firmadigital-api
+    container_name: firmadigital-api-elizalde
     ports:
-      - "8080:8080"    # Puerto HTTP para la API
+      - "8085:8080"    # Puerto HTTP para la API
     environment:
       - JWT_SECRET=${JWT_SECRET}
-      - JAVA_OPTS=-server -Xms512m -Xmx1024m -XX:MetaspaceSize=96M -XX:MaxMetaspaceSize=192m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1HeapRegionSize=8m -XX:+ParallelRefProcEnabled -XX:+UseStringDeduplication -Xlog:gc*:file=/opt/jboss/wildfly/standalone/log/gc.log:time,uptime,level,tags:filecount=3,filesize=10m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/jboss/wildfly/standalone/log/heap-dump.hprof
+      - JAVA_OPTS=-server -Djava.awt.headless=true -Xms512m -Xmx1024m -XX:MetaspaceSize=96M -XX:MaxMetaspaceSize=192m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1HeapRegionSize=8m -XX:+ParallelRefProcEnabled -XX:+UseStringDeduplication -Xlog:gc*:file=/opt/jboss/wildfly/standalone/log/gc.log:time,uptime,level,tags:filecount=3,filesize=10m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/jboss/wildfly/standalone/log/heap-dump.hprof
     mem_limit: 1280m
     memswap_limit: 1280m
     volumes:
