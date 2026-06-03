@@ -105,19 +105,7 @@ public class QrAppereance implements CustomAppearance {
             LOGGER.log(Level.WARNING, "Error al cargar isologo: {0}", e.getMessage());
         }
 
-        // Cargar slogan.png para franja izquierda
-        byte[] sloganBytes = null;
-        try (InputStream sloganStream = getClass().getClassLoader().getResourceAsStream("images/slogan.png")) {
-            if (sloganStream != null) {
-                sloganBytes = sloganStream.readAllBytes();
-            } else {
-                LOGGER.log(Level.WARNING, "No se encontró slogan.png en resources/images/");
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al cargar slogan: {0}", e.getMessage());
-        }
-
-        // Generar QR con isologo pixelado integrado
+        // Generar QR con isologo nítido en el centro
         byte[] byteQR = null;
         try {
             byteQR = QRCode.generateQR(text, 300, 300, isologoBytes);
@@ -137,37 +125,12 @@ public class QrAppereance implements CustomAppearance {
         float totalWidth = signaturePositionOnPage.getWidth();
         float totalHeight = signaturePositionOnPage.getHeight();
 
-        // Layout: [Slogan imagen] [QR con isologo pixelado] [Texto firmante]
-        // QR cuadrado = totalHeight, slogan proporcional, resto = texto
+        // Layout: [QR con isologo] [Texto firmante]
         float qrSide = totalHeight;
-        // slogan.png = 213x450 → para que ocupe toda la altura, ancho = height * 213/450
-        float sloganRatio = 213f / 450f;
-        float brandWidth = totalHeight * sloganRatio;
-        float qrStartX = brandWidth + 2f;
-        float textStartX = qrStartX + qrSide + 2f;
+        float qrStartX = 0f;
+        float textStartX = qrSide + 2f;
 
-        // Si no cabe (slogan + QR + texto mínimo > totalWidth), reducir QR
-        float minTextWidth = totalWidth * 0.3f;
-        float availableForQR = totalWidth - brandWidth - minTextWidth - 6f;
-        if (qrSide > availableForQR) {
-            qrSide = availableForQR;
-            qrStartX = brandWidth + 2f;
-            textStartX = qrStartX + qrSide + 2f;
-        }
-
-
-        // === 1. Slogan imagen (franja izquierda) ===
-        if (sloganBytes != null) {
-            Rectangle sloganRect = new Rectangle(0, 0, brandWidth, totalHeight);
-            Image sloganImage = new Image(ImageDataFactory.create(sloganBytes));
-            sloganImage.scaleToFit(brandWidth, totalHeight);
-            sloganImage.setMargins(0, 0, 0, 0);
-            try (Canvas sloganCanvas = new Canvas(canvas, sloganRect)) {
-                sloganCanvas.add(sloganImage);
-            }
-        }
-
-        // === 2. QR con isologo ===
+        // === 1. QR con isologo ===
         if (byteQR != null) {
             Rectangle qrRect = new Rectangle(qrStartX, 0, qrSide, qrSide);
             Image qrImage = new Image(ImageDataFactory.create(byteQR));
