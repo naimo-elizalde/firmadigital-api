@@ -97,7 +97,7 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             float qrPosX = 50f;
             float qrPosY = 50f;
             float qrAncho = 200f;
-            float qrAlto = 100f;
+            float qrAlto = 50f;
 
             if (jsonMetadata != null && !jsonMetadata.isEmpty()) {
                 try {
@@ -149,7 +149,7 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
 
             // Forzar tamaño mínimo para que la firma sea legible
             if (qrAncho < 150f) qrAncho = 150f;
-            if (qrAlto < 55f) qrAlto = 55f;
+            if (qrAlto < 50f) qrAlto = 50f;
 
             params.setProperty("PositionOnPageLowerLeftX", String.valueOf((int) qrPosX));
             params.setProperty("PositionOnPageLowerLeftY", String.valueOf((int) qrPosY));
