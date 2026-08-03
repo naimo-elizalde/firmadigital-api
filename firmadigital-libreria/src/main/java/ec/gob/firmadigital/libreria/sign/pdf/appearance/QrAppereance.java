@@ -193,7 +193,7 @@ public class QrAppereance implements CustomAppearance {
         // Fecha
         Text fecha = new Text("Fecha: " + signTime);
         Paragraph pFecha = new Paragraph().add(fecha).setFont(fontCourier).setMargin(0)
-                .setMultipliedLeading(1.0f).setFontSize(3.25f).setPaddingTop(2f);
+                .setMultipliedLeading(1.0f).setFontSize(4.25f).setPaddingTop(2f);
         textDiv.add(pFecha);
 
         // Validar con
