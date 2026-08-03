@@ -196,12 +196,6 @@ public class QrAppereance implements CustomAppearance {
                 .setMultipliedLeading(1.0f).setFontSize(4.25f).setPaddingTop(2f);
         textDiv.add(pFecha);
 
-        // Validar con
-        Text validar = new Text("Validar únicamente con Corporación Elizalde.");
-        Paragraph pValidar = new Paragraph().add(validar).setFont(fontCourier).setMargin(0)
-                .setMultipliedLeading(1.0f).setFontSize(3.25f).setPaddingTop(1f);
-        textDiv.add(pValidar);
-
         try (Canvas textLayoutCanvas = new Canvas(canvas, signatureRect)) {
             textLayoutCanvas.add(textDiv);
         }
