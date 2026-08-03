@@ -156,10 +156,27 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             params.setProperty("PositionOnPageUpperRightX", String.valueOf((int) qrAncho));
             params.setProperty("PositionOnPageUpperRightY", String.valueOf((int) qrAlto));
 
-            // 5. Firmar
+            // 5. Firmar (con retry sin TSA si falla)
             PrivateKeySigner signer = new PrivateKeySigner(privateKey, DigestAlgorithm.SHA256);
-            PadesBasic padesSigner = new PadesBasic(signer);
-            byte[] documentoFirmado = padesSigner.sign(new ByteArrayInputStream(docBytes), signer, certChain, params);
+            byte[] documentoFirmado;
+            boolean firmadoSinTSA = false;
+
+            try {
+                PadesBasic padesSigner = new PadesBasic(signer);
+                documentoFirmado = padesSigner.sign(new ByteArrayInputStream(docBytes), signer, certChain, params);
+            } catch (RuntimeException tsaEx) {
+                String tsaMsg = tsaEx.getMessage() != null ? tsaEx.getMessage() : "";
+                if (tsaMsg.contains("TSA")) {
+                    LOGGER.log(Level.WARNING, "TSA fallo, firmando sin sellado de tiempo");
+                    // Quitar identificacion para que no use TSA
+                    params.remove("identificacion");
+                    PadesBasic padesSinTsa = new PadesBasic(signer);
+                    documentoFirmado = padesSinTsa.sign(new ByteArrayInputStream(docBytes), signer, certChain, params);
+                    firmadoSinTSA = true;
+                } else {
+                    throw tsaEx;
+                }
+            }
 
             // 6. Respuesta
             String documentoFirmadoBase64 = Base64.getEncoder().encodeToString(documentoFirmado);
@@ -187,12 +204,8 @@ public class ServicioAppFirmarDocumentoConQR extends RequestSizeFilter {
             LOGGER.log(Level.SEVERE, "Error de IO: {0}", e);
             return crearRespuestaError("Error al procesar el documento: " + msg);
         } catch (RuntimeException e) {
-            String msg = e.getMessage() != null ? e.getMessage() : "";
-            if (msg.contains("TSA")) {
-                return crearRespuestaError(msg);
-            }
             LOGGER.log(Level.SEVERE, "Error al firmar: {0}", e);
-            return crearRespuestaError("Error al firmar documento: " + msg);
+            return crearRespuestaError("Error al firmar documento: " + (e.getMessage() != null ? e.getMessage() : ""));
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error inesperado: {0}", e);
             return crearRespuestaError("Error interno al firmar documento. Intente nuevamente");

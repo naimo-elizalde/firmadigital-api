@@ -53,7 +53,6 @@ public class PadesBasic extends BaseSigner {
             Certificate[] certChain, Properties params) throws IOException {
         try {
             ITSAClient tsaClient = createTsaClient(params);
-
             int estimatedSize = tsaClient != null ? 16384 : 0;
 
             pdfSigner.signDetached(new BouncyCastleDigest(), externalSignature, certChain, null, null, tsaClient,
@@ -64,12 +63,16 @@ public class PadesBasic extends BaseSigner {
             throw new RuntimeException(e);
         } catch (RuntimeException e) {
             String msg = e.getMessage() + " " + (e.getCause() != null ? e.getCause().getMessage() : "");
+            if (msg.contains("TSA") || msg.contains("Invalid TSA") || msg.contains("PdfException")) {
+                LOGGER.log(Level.WARNING, "TSA fallo: {0}", msg);
+                throw new RuntimeException("TSA:" + msg, e);
+            }
             if (msg.contains("401")) {
-                LOGGER.log(Level.SEVERE, "Error de autenticacion TSA (401): Credenciales incorrectas");
-                throw new RuntimeException("Error de autenticacion TSA (401): Credenciales incorrectas.", e);
+                LOGGER.log(Level.SEVERE, "Error de autenticacion TSA (401)");
+                throw new RuntimeException("TSA:Error de autenticacion TSA (401).", e);
             } else if (msg.contains("409")) {
-                LOGGER.log(Level.SEVERE, "Error de conflicto TSA (409): Hash duplicado");
-                throw new RuntimeException("Error de conflicto TSA (409): Hash duplicado.", e);
+                LOGGER.log(Level.SEVERE, "Error de conflicto TSA (409)");
+                throw new RuntimeException("TSA:Error de conflicto TSA (409).", e);
             }
             throw e;
         }
